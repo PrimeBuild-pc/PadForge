@@ -51,6 +51,8 @@ public sealed class PadFrame
     public float LeftTrigger { get; init; }
     public float RightTrigger { get; init; }
     public GamepadButtons Buttons { get; init; }
+
+    public float RightRaw { get; init; }
 }
 
 public static class AxisMath

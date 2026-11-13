@@ -1,0 +1,35 @@
+name: release
+
+# Push a tag such as v0.2.0-beta.1 to build a self-contained zip and attach it to a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test
+        run: dotnet test tests/PadForge.Core.Tests/PadForge.Core.Tests.csproj -c Release
+      - name: Publish
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          dotnet publish src/PadForge/PadForge.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -p:Version=$version -o out/PadForge
+          Compress-Archive -Path out/PadForge/* -DestinationPath "PadForge-$version-win-x64.zip"
+      - name: Create release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $flags = @('--generate-notes')
+          if ($version.Contains('-')) { $flags += '--prerelease' }
+          gh release create '${{ github.ref_name }}' "PadForge-$version-win-x64.zip" --title "PadForge $version" @flags

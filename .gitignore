@@ -8,3 +8,5 @@ obj/
 TestResults/
 *.log
 .sandbox/
+out/
+*.zip

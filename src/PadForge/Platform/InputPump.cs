@@ -12,11 +12,18 @@ public interface IHotkeyBinding
 
 /// <summary>
 /// Reads relative mouse deltas with Raw Input and keyboard state with
-/// GetAsyncKeyState. Input is observed, not swallowed, so the game still
-/// receives the real keyboard and mouse.
+/// GetAsyncKeyState. While blocking is on, low-level hooks swallow mapped keys,
+/// mapped clicks and cursor movement so Windows and the game do not see them;
+/// swallowed presses are tracked here because GetAsyncKeyState no longer sees
+/// them. Raw Input still reports mouse motion, which keeps the right stick fed.
 /// </summary>
-public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, IDisposable
+public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, IInputBlocker, IDisposable
 {
+    private const int WhKeyboardLl = 13;
+    private const int WhMouseLl = 14;
+    private const int KeyStates = 0x103;
+    private static readonly long WheelPulseTicks = System.Diagnostics.Stopwatch.Frequency / 20;
+
     private const int HotkeyId = 1;
     private const uint WmHotkey = 0x0312;
     private const uint WmQuit = 0x0012;
@@ -44,12 +51,58 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
     private string? _hotkeyStatus;
     private bool _disposed;
 
+    private readonly HookProc _keyboardProc;
+    private readonly HookProc _mouseProc;
+    private IntPtr _keyboardHook;
+    private IntPtr _mouseHook;
+    private readonly bool[] _swallowed = new bool[KeyStates];
+    private readonly long[] _wheelUntil = new long[2];
+    private bool[] _blockTable = new bool[KeyStates];
+    private int[]? _blockKeys;
+    private int _blockPass = -1;
+    private volatile bool _blocking;
+
     public InputPump()
     {
         _bufferPin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
         _bufferPointer = _bufferPin.AddrOfPinnedObject();
         _windowProc = WindowProc;
+        _keyboardProc = KeyboardHook;
+        _mouseProc = MouseHook;
     }
+
+    public bool IsBlocking => _blocking;
+
+    public void SetBlocking(bool active, int[] keys, int passThroughKey)
+    {
+        if (!ReferenceEquals(keys, _blockKeys) || passThroughKey != _blockPass)
+        {
+            var table = new bool[KeyStates];
+            foreach (int key in keys)
+            {
+                if (key > 0 && key < KeyStates && key != passThroughKey)
+                    table[key] = true;
+            }
+
+            // The hook reports left/right modifiers; a binding saved as plain Shift, Ctrl or Alt covers both.
+            for (int generic = 0x10; generic <= 0x12; generic++)
+            {
+                if (!table[generic])
+                    continue;
+                int left = LeftOf(generic);
+                table[left] = left != passThroughKey;
+                table[left + 1] = left + 1 != passThroughKey;
+            }
+
+            Volatile.Write(ref _blockTable, table);
+            _blockKeys = keys;
+            _blockPass = passThroughKey;
+        }
+
+        _blocking = active;
+    }
+
+    private static int LeftOf(int generic) => generic switch { 0x10 => 0xA0, 0x11 => 0xA2, _ => 0xA4 };
 
     public event Action? HotkeyPressed;
 
@@ -85,8 +138,17 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
 
     public bool IsDown(int virtualKey)
     {
-        if (virtualKey <= 0)
+        if (virtualKey <= 0 || virtualKey >= KeyStates)
             return false;
+
+        if (VirtualKeyCodes.IsWheel(virtualKey))
+            return System.Diagnostics.Stopwatch.GetTimestamp() < Volatile.Read(ref _wheelUntil[virtualKey - VirtualKeyCodes.WheelUp]);
+
+        if (_swallowed[virtualKey])
+            return true;
+
+        if (virtualKey is >= 0x10 and <= 0x12 && (_swallowed[LeftOf(virtualKey)] || _swallowed[LeftOf(virtualKey) + 1]))
+            return true;
 
         return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     }
@@ -148,6 +210,8 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
 
         RegisterMouse();
         ApplyHotkey();
+        _keyboardHook = SetWindowsHookExW(WhKeyboardLl, _keyboardProc, windowClass.hInstance, 0);
+        _mouseHook = SetWindowsHookExW(WhMouseLl, _mouseProc, windowClass.hInstance, 0);
         _ready.Set();
 
         while (GetMessage(out Msg message, IntPtr.Zero, 0, 0) > 0)
@@ -155,6 +219,15 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
             TranslateMessage(ref message);
             DispatchMessage(ref message);
         }
+
+        _blocking = false;
+        if (_keyboardHook != IntPtr.Zero)
+            UnhookWindowsHookEx(_keyboardHook);
+        if (_mouseHook != IntPtr.Zero)
+            UnhookWindowsHookEx(_mouseHook);
+        _keyboardHook = IntPtr.Zero;
+        _mouseHook = IntPtr.Zero;
+        Array.Clear(_swallowed);
 
         UnregisterHotKey(_hwnd, HotkeyId);
         DestroyWindow(_hwnd);
@@ -240,6 +313,98 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
         Interlocked.Add(ref _dx, x);
         Interlocked.Add(ref _dy, y);
     }
+
+    private IntPtr KeyboardHook(int code, IntPtr wParam, IntPtr lParam)
+    {
+        if (code >= 0)
+        {
+            int virtualKey = Marshal.ReadInt32(lParam);
+            uint message = (uint)wParam.ToInt64();
+            bool down = message is 0x0100 or 0x0104;
+            if (virtualKey > 0 && virtualKey < KeyStates && Swallow(virtualKey, down))
+                return (IntPtr)1;
+        }
+
+        return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+    }
+
+    private IntPtr MouseHook(int code, IntPtr wParam, IntPtr lParam)
+    {
+        if (code >= 0)
+        {
+            uint message = (uint)wParam.ToInt64();
+            int high = Marshal.ReadInt32(lParam, 8) >> 16;
+            if (message == 0x0200)
+            {
+                // Freeze the cursor; Raw Input still delivers the motion to the stick.
+                if (_blocking)
+                    return (IntPtr)1;
+            }
+            else if (message == 0x020A)
+            {
+                int virtualKey = (short)high > 0 ? VirtualKeyCodes.WheelUp : VirtualKeyCodes.WheelDown;
+                long until = System.Diagnostics.Stopwatch.GetTimestamp() + WheelPulseTicks;
+                Volatile.Write(ref _wheelUntil[virtualKey - VirtualKeyCodes.WheelUp], until);
+                if (_blocking && Volatile.Read(ref _blockTable)[virtualKey])
+                    return (IntPtr)1;
+            }
+            else
+            {
+                int xButton = (high & 0xFFFF) == 2 ? VirtualKeyCodes.MouseX2 : VirtualKeyCodes.MouseX1;
+                (int virtualKey, bool down) = message switch
+                {
+                    0x0201 => (VirtualKeyCodes.MouseLeft, true),
+                    0x0202 => (VirtualKeyCodes.MouseLeft, false),
+                    0x0204 => (VirtualKeyCodes.MouseRight, true),
+                    0x0205 => (VirtualKeyCodes.MouseRight, false),
+                    0x0207 => (VirtualKeyCodes.MouseMiddle, true),
+                    0x0208 => (VirtualKeyCodes.MouseMiddle, false),
+                    0x020B => (xButton, true),
+                    0x020C => (xButton, false),
+                    _ => (0, false),
+                };
+                if (virtualKey != 0 && Swallow(virtualKey, down))
+                    return (IntPtr)1;
+            }
+        }
+
+        return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+    }
+
+    /// <summary>
+    /// A release is swallowed only when its press was, so a key held while
+    /// blocking switches on or off never sticks down in Windows.
+    /// </summary>
+    private bool Swallow(int virtualKey, bool down)
+    {
+        if (!down)
+        {
+            if (!_swallowed[virtualKey])
+                return false;
+            _swallowed[virtualKey] = false;
+            return true;
+        }
+
+        if (_swallowed[virtualKey])
+            return true;
+
+        if (!_blocking || !Volatile.Read(ref _blockTable)[virtualKey])
+            return false;
+
+        _swallowed[virtualKey] = true;
+        return true;
+    }
+
+    private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookExW(int hookId, HookProc procedure, IntPtr module, uint threadId);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
 
     private delegate IntPtr WndProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 

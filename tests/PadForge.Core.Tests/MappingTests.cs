@@ -73,6 +73,51 @@ public class MappingTests
     }
 
     [Fact]
+    public void Shaper_AntiDeadzoneLiftsSmallDeflectionAndKeepsTheEdge()
+    {
+        var (lifted, _) = StickShaper.Apply(0.5f, 0f, curve: 1f, deadzone: 0f, antiDeadzone: 0.2f);
+        var (full, _) = StickShaper.Apply(1f, 0f, curve: 1f, deadzone: 0f, antiDeadzone: 0.2f);
+        var (inside, _) = StickShaper.Apply(0.05f, 0f, curve: 1f, deadzone: 0.1f, antiDeadzone: 0.2f);
+
+        Assert.Equal(0.6f, lifted, 3);
+        Assert.Equal(1f, full, 3);
+        Assert.Equal(0f, inside);
+    }
+
+    [Fact]
+    public void Update_InvertXFlipsHoldDirection()
+    {
+        var converter = new MouseToStickConverter();
+        var tuning = new StickTuning(1f, 1f, 0f, Spring: false, SpringRate: 26f, InvertX: true);
+
+        var sample = converter.Update(100f, 0f, tuning, 0.02f);
+
+        Assert.Equal(-100f * MouseToStickConverter.HoldGainPerCount, sample.X, 3);
+    }
+
+    [Fact]
+    public void Update_VerticalScaleReachesFullStickAtHalfSpeed()
+    {
+        var converter = new MouseToStickConverter();
+        var tuning = new StickTuning(1f, 1f, 0f, Spring: true, SpringRate: 40f, VerticalScale: 2f);
+        float step = MouseToStickConverter.FullScaleCountsPerSecond * 0.02f / 2f;
+
+        (float X, float Y) latest = default;
+        for (int i = 0; i < 40; i++)
+            latest = converter.Update(0f, step, tuning, 0.02f);
+
+        Assert.True(latest.Y < -0.75f);
+    }
+
+    [Fact]
+    public void Calibration_MapsReferenceSpeedToUnitSensitivity()
+    {
+        Assert.True(FlickCalibration.TrySensitivity(MouseToStickConverter.FullScaleCountsPerSecond, out float sensitivity));
+        Assert.Equal(1f, sensitivity, 3);
+        Assert.False(FlickCalibration.TrySensitivity(100f, out _));
+    }
+
+    [Fact]
     public void Shaper_KeepsDiagonalDirection()
     {
         var (x, y) = StickShaper.Apply(0.4f, 0.4f, curve: 2f, deadzone: 0f);
@@ -140,5 +185,27 @@ public class MappingTests
         Assert.Equal(GamepadButtons.A, composed.Buttons);
         Assert.Equal(255, composed.RightTrigger);
         Assert.Equal(0, composed.LeftTrigger);
+    }
+
+    [Theory]
+    [InlineData((short)0, false, 128)]
+    [InlineData((short)32767, false, 255)]
+    [InlineData((short)-32768, false, 0)]
+    [InlineData((short)32767, true, 0)]
+    [InlineData((short)-32768, true, 255)]
+    [InlineData((short)0, true, 128)]
+    public void DualShock4Axis_CentersAt128AndFlipsY(short value, bool invert, int expected)
+    {
+        Assert.Equal(expected, DualShock4Mapping.Axis(value, invert));
+    }
+
+    [Fact]
+    public void DualShock4Hat_CombinesDiagonalsAndCancelsOpposites()
+    {
+        Assert.Equal(-1, DualShock4Mapping.Hat(GamepadButtons.None));
+        Assert.Equal(0, DualShock4Mapping.Hat(GamepadButtons.DpadUp));
+        Assert.Equal(1, DualShock4Mapping.Hat(GamepadButtons.DpadUp | GamepadButtons.DpadRight));
+        Assert.Equal(5, DualShock4Mapping.Hat(GamepadButtons.DpadDown | GamepadButtons.DpadLeft));
+        Assert.Equal(6, DualShock4Mapping.Hat(GamepadButtons.DpadLeft | GamepadButtons.DpadUp | GamepadButtons.DpadDown));
     }
 }

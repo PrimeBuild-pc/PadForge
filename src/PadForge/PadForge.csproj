@@ -18,9 +18,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Company>Prime Build</Company>
     <Product>PadForge</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Description>Turn keyboard and mouse input into a virtual Xbox 360 controller.</Description>
-    <ApplicationIcon />
+    <ApplicationIcon>Assets\PadForge.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,7 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\**\*" />
+    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 </Project>

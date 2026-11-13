@@ -9,7 +9,8 @@ public readonly record struct ComposedInput(
     float RightY,
     byte LeftTrigger,
     byte RightTrigger,
-    GamepadButtons Buttons)
+    GamepadButtons Buttons,
+    float RightRaw = 0f)
 {
     public PadFrame ToFrame() => new()
     {
@@ -20,6 +21,7 @@ public readonly record struct ComposedInput(
         LeftTrigger = LeftTrigger / 255f,
         RightTrigger = RightTrigger / 255f,
         Buttons = Buttons,
+        RightRaw = RightRaw,
     };
 
     public GamepadReport ToReport() => new(
@@ -59,6 +61,12 @@ public static class PadComposer
             leftY /= leftMagnitude;
         }
 
+        if (Down(ControlTarget.LeftStickWalk))
+        {
+            leftX *= settings.WalkScale;
+            leftY *= settings.WalkScale;
+        }
+
         GamepadButtons buttons = GamepadButtons.None;
         if (Down(ControlTarget.A)) buttons |= GamepadButtons.A;
         if (Down(ControlTarget.B)) buttons |= GamepadButtons.B;
@@ -78,6 +86,6 @@ public static class PadComposer
         byte leftTrigger = Down(ControlTarget.LeftTrigger) ? (byte)255 : (byte)0;
         byte rightTrigger = Down(ControlTarget.RightTrigger) ? (byte)255 : (byte)0;
 
-        return new ComposedInput(leftX, leftY, rightX, rightY, leftTrigger, rightTrigger, buttons);
+        return new ComposedInput(leftX, leftY, rightX, rightY, leftTrigger, rightTrigger, buttons, rightStick.RawMagnitude);
     }
 }

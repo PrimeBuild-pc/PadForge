@@ -11,6 +11,15 @@ public interface IKeyboardSource
 }
 
 /// <summary>
+/// Hides mapped keys and clicks from Windows while the virtual pad is in use,
+/// so a game does not see both the keyboard and the controller.
+/// </summary>
+public interface IInputBlocker
+{
+    void SetBlocking(bool active, int[] keys, int passThroughKey);
+}
+
+/// <summary>
 /// Win32 virtual-key codes used by the default profile. Values match the
 /// Winuser.h constants so the WinUI layer can pass them through unchanged.
 /// </summary>
@@ -43,5 +52,12 @@ public static class VirtualKeyCodes
     public const int LeftShift = 0xA0;
     public const int LeftControl = 0xA2;
 
-    public static bool IsMouseButton(int virtualKey) => virtualKey is >= MouseLeft and <= MouseX2;
+    // Outside the Win32 range on purpose: a wheel notch has no key state, so
+    // the input layer turns each notch into a short press.
+    public const int WheelUp = 0x101;
+    public const int WheelDown = 0x102;
+
+    public static bool IsWheel(int virtualKey) => virtualKey is WheelUp or WheelDown;
+
+    public static bool IsMouseButton(int virtualKey) => virtualKey is >= MouseLeft and <= MouseX2 || IsWheel(virtualKey);
 }

@@ -1,5 +1,6 @@
 using PadForge.Core.Input;
 using PadForge.Core.Mapping;
+using PadForge.Core.Output;
 using PadForge.Core.Runtime;
 
 namespace PadForge.Core.Profiles;
@@ -15,17 +16,35 @@ public sealed class StickSettings
     public bool Spring { get; set; } = true;
 
     public double SpringRate { get; set; } = 26;
+
+    public double AntiDeadzone { get; set; }
+
+    public bool InvertX { get; set; }
+
+    public bool InvertY { get; set; }
+
+    public double VerticalScale { get; set; } = 1;
 }
 
 public sealed class Profile
 {
-    public int Version { get; set; } = 1;
+    public const int CurrentVersion = 2;
+
+    public int Version { get; set; } = CurrentVersion;
 
     public string Name { get; set; } = "Default";
 
     public int HotkeyVirtualKey { get; set; } = VirtualKeyCodes.F8;
 
     public StickSettings RightStick { get; set; } = new();
+
+    /// <summary>Left stick deflection while the walk key is held.</summary>
+    public double WalkScale { get; set; } = 0.5;
+
+    /// <summary>Keep mapped keys and clicks away from Windows while the pad is sending.</summary>
+    public bool HideInput { get; set; } = true;
+
+    public PadKind PadKind { get; set; } = PadKind.Xbox360;
 
     public Dictionary<string, int> Bindings { get; set; } = new(StringComparer.Ordinal);
 
@@ -55,10 +74,26 @@ public sealed class Profile
                 RightStick.Curve,
                 RightStick.Deadzone,
                 RightStick.Spring,
-                RightStick.SpringRate),
+                RightStick.SpringRate,
+                RightStick.AntiDeadzone,
+                RightStick.InvertX,
+                RightStick.InvertY,
+                RightStick.VerticalScale),
             HotkeyVirtualKey = HotkeyVirtualKey,
+            WalkScale = (float)Math.Clamp(WalkScale, 0.1, 1),
+            HideInput = HideInput,
+            PadKind = Enum.IsDefined(PadKind) ? PadKind : PadKind.Xbox360,
             Keys = keys,
         };
+    }
+
+    /// <summary>Adds defaults for controls that did not exist when the profile was written.</summary>
+    public void Upgrade()
+    {
+        if (Version < 2 && Binding(ControlTarget.LeftStickWalk) == 0 && !Bindings.ContainsValue(VirtualKeyCodes.LeftControl))
+            SetBinding(ControlTarget.LeftStickWalk, VirtualKeyCodes.LeftControl);
+
+        Version = CurrentVersion;
     }
 
     public static Profile CreateDefault()
@@ -84,6 +119,7 @@ public sealed class Profile
         profile.SetBinding(ControlTarget.LeftStickDown, VirtualKeyCodes.S);
         profile.SetBinding(ControlTarget.LeftStickLeft, VirtualKeyCodes.A);
         profile.SetBinding(ControlTarget.LeftStickRight, VirtualKeyCodes.D);
+        profile.SetBinding(ControlTarget.LeftStickWalk, VirtualKeyCodes.LeftControl);
         return profile;
     }
 }

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Checks the real ViGEm output and input hooks outside the UI. Run it on a test machine, not one with anti-cheat. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+    <ProjectReference Include="..\..\src\PadForge.Core\PadForge.Core.csproj" />
+    <Compile Include="..\..\src\PadForge\Output\VigemGamepad.cs" Link="Linked\VigemGamepad.cs" />
+    <Compile Include="..\..\src\PadForge\Output\VigemBusProbe.cs" Link="Linked\VigemBusProbe.cs" />
+    <Compile Include="..\..\src\PadForge\Platform\InputPump.cs" Link="Linked\InputPump.cs" />
+  </ItemGroup>
+</Project>

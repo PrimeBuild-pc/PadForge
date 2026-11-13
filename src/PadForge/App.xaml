@@ -11,91 +11,212 @@
             </ResourceDictionary.MergedDictionaries>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
-                    <Color x:Key="SystemAccentColorLight3">#FFF6D7B8</Color>
-                    <Color x:Key="SystemAccentColorLight2">#FFEEB98A</Color>
-                    <Color x:Key="SystemAccentColorLight1">#FFE7A15F</Color>
-                    <Color x:Key="SystemAccentColor">#FFE08A45</Color>
-                    <Color x:Key="SystemAccentColorDark1">#FFC67538</Color>
-                    <Color x:Key="SystemAccentColorDark2">#FFA85E2C</Color>
-                    <Color x:Key="SystemAccentColorDark3">#FF8A4E24</Color>
+                    <Color x:Key="SystemAccentColorLight3">#FFFFD9BF</Color>
+                    <Color x:Key="SystemAccentColorLight2">#FFFFBE93</Color>
+                    <Color x:Key="SystemAccentColorLight1">#FFFFA266</Color>
+                    <Color x:Key="SystemAccentColor">#FFFF8A3D</Color>
+                    <Color x:Key="SystemAccentColorDark1">#FFE5732A</Color>
+                    <Color x:Key="SystemAccentColorDark2">#FFC25E1F</Color>
+                    <Color x:Key="SystemAccentColorDark3">#FF9A4A18</Color>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
-            <SolidColorBrush x:Key="ForgeBackgroundBrush" Color="#FF101216" />
-            <SolidColorBrush x:Key="ForgeCardBrush" Color="#FF1A1E26" />
-            <SolidColorBrush x:Key="ForgeCardBorderBrush" Color="#FF323846" />
-            <SolidColorBrush x:Key="ForgeTextBrush" Color="#FFF3F5F8" />
-            <SolidColorBrush x:Key="ForgeMutedBrush" Color="#FFA7B0C0" />
-            <SolidColorBrush x:Key="ForgeAccentBrush" Color="#FFE08A45" />
-            <SolidColorBrush x:Key="ForgeAccentDeepBrush" Color="#FF1C140E" />
+            <!-- Forge palette: near-black shell, quiet cards, one ember accent. -->
+            <Color x:Key="ForgeBackgroundColor">#FF0B0C10</Color>
+            <SolidColorBrush x:Key="ForgeBackgroundBrush" Color="#FF0B0C10" />
+            <SolidColorBrush x:Key="ForgeSidebarBrush" Color="#FF0F1015" />
+            <SolidColorBrush x:Key="ForgeCardBrush" Color="#FF15161C" />
+            <SolidColorBrush x:Key="ForgeCardBorderBrush" Color="#FF24262F" />
+            <SolidColorBrush x:Key="ForgeRaisedBrush" Color="#FF1C1E26" />
+            <SolidColorBrush x:Key="ForgeHoverBrush" Color="#FF23252F" />
+            <SolidColorBrush x:Key="ForgeTextBrush" Color="#FFF2F3F7" />
+            <SolidColorBrush x:Key="ForgeMutedBrush" Color="#FF9298A8" />
+            <SolidColorBrush x:Key="ForgeSubtleBrush" Color="#FF5E6474" />
+            <SolidColorBrush x:Key="ForgeAccentBrush" Color="#FFFF8A3D" />
+            <SolidColorBrush x:Key="ForgeAccentSoftBrush" Color="#FF2B1A10" />
+            <SolidColorBrush x:Key="ForgeAccentLineBrush" Color="#66FF8A3D" />
+            <SolidColorBrush x:Key="ForgeAccentDeepBrush" Color="#FF1A0F07" />
             <SolidColorBrush x:Key="ForgeGoodBrush" Color="#FF3DDC97" />
-            <SolidColorBrush x:Key="ForgeWarnBrush" Color="#FFE7C15A" />
+            <SolidColorBrush x:Key="ForgeWarnBrush" Color="#FFF2C14E" />
             <SolidColorBrush x:Key="ForgeBadBrush" Color="#FFFF6B6B" />
-            <SolidColorBrush x:Key="ForgeWellBrush" Color="#FF12151C" />
-            <SolidColorBrush x:Key="ForgeButtonBrush" Color="#FF2A3140" />
-            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FFE08A45" />
-            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FFC67538" />
-            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#FFA85E2C" />
-            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FF1C140E" />
+            <SolidColorBrush x:Key="ForgeWellBrush" Color="#FF0F1015" />
+            <SolidColorBrush x:Key="ForgeButtonBrush" Color="#FF262833" />
+            <SolidColorBrush x:Key="ForgeBodyBrush" Color="#FF242631" />
+            <SolidColorBrush x:Key="ForgeBodyLineBrush" Color="#FF3A3D4B" />
+            <LinearGradientBrush x:Key="ForgeEmberBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FFFFB054" Offset="0" />
+                <GradientStop Color="#FFFF7A2F" Offset="0.55" />
+                <GradientStop Color="#FFE5502A" Offset="1" />
+            </LinearGradientBrush>
 
-            <Style x:Key="SectionLabel" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FFFF8A3D" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FFE5732A" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#FFC25E1F" />
+            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FF1A0F07" />
+
+            <FontFamily x:Key="ForgeDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+            <FontFamily x:Key="ForgeMonoFont">Cascadia Mono, Consolas</FontFamily>
+
+            <Style x:Key="PageTitle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource ForgeDisplayFont}" />
+                <Setter Property="FontSize" Value="28" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="CharacterSpacing" Value="120" />
+                <Setter Property="Foreground" Value="{StaticResource ForgeTextBrush}" />
+            </Style>
+            <Style x:Key="PageSubtitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="Foreground" Value="{StaticResource ForgeMutedBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="CardTitle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource ForgeDisplayFont}" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource ForgeTextBrush}" />
+            </Style>
+            <Style x:Key="SectionLabel" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CharacterSpacing" Value="100" />
+                <Setter Property="Foreground" Value="{StaticResource ForgeSubtleBrush}" />
             </Style>
             <Style x:Key="FieldLabel" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="Foreground" Value="{StaticResource ForgeTextBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
+            <Style x:Key="FieldValue" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontFamily" Value="{StaticResource ForgeMonoFont}" />
+                <Setter Property="Foreground" Value="{StaticResource ForgeMutedBrush}" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
             <Style x:Key="MutedBody" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="Foreground" Value="{StaticResource ForgeMutedBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="LineHeight" Value="19" />
             </Style>
             <Style x:Key="ForgeCard" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource ForgeCardBrush}" />
                 <Setter Property="BorderBrush" Value="{StaticResource ForgeCardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Padding" Value="20" />
             </Style>
+            <Style x:Key="ForgeSlider" TargetType="Slider" BasedOn="{StaticResource DefaultSliderStyle}">
+                <Setter Property="Margin" Value="0,-6,0,0" />
+            </Style>
+
+            <!-- Shared button chrome: flat fill, hover and press shades, dimmed when disabled. -->
+            <ControlTemplate x:Key="ForgeButtonTemplate" TargetType="Button">
+                <Grid x:Name="RootGrid"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}"
+                      CornerRadius="{TemplateBinding CornerRadius}"
+                      Padding="{TemplateBinding Padding}">
+                    <ContentPresenter
+                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Foreground="{TemplateBinding Foreground}"
+                        Content="{TemplateBinding Content}" />
+                    <VisualStateManager.VisualStateGroups>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="PointerOver">
+                                <VisualState.Setters>
+                                    <Setter Target="RootGrid.Opacity" Value="0.88" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Pressed">
+                                <VisualState.Setters>
+                                    <Setter Target="RootGrid.Opacity" Value="0.72" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Disabled">
+                                <VisualState.Setters>
+                                    <Setter Target="RootGrid.Opacity" Value="0.4" />
+                                </VisualState.Setters>
+                            </VisualState>
+                        </VisualStateGroup>
+                    </VisualStateManager.VisualStateGroups>
+                </Grid>
+            </ControlTemplate>
+
             <Style x:Key="ForgePrimaryButton" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource ForgeAccentBrush}" />
+                <Setter Property="Background" Value="{StaticResource ForgeEmberBrush}" />
                 <Setter Property="Foreground" Value="{StaticResource ForgeAccentDeepBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="Padding" Value="18,10" />
+                <Setter Property="Padding" Value="18,9" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template" Value="{StaticResource ForgeButtonTemplate}" />
+            </Style>
+            <Style x:Key="ForgeSecondaryButton" TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource ForgeRaisedBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource ForgeTextBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource ForgeCardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template" Value="{StaticResource ForgeButtonTemplate}" />
+            </Style>
+            <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource ForgeSecondaryButton}">
+                <Setter Property="Padding" Value="12,5" />
+                <Setter Property="CornerRadius" Value="999" />
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+            <Style x:Key="CalloutButton" TargetType="Button" BasedOn="{StaticResource ForgeSecondaryButton}">
+                <Setter Property="Background" Value="{StaticResource ForgeCardBrush}" />
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+
+            <!-- Sidebar entry: a radio button that looks like a nav row. -->
+            <Style x:Key="NavItem" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{StaticResource ForgeMutedBrush}" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="GroupName" Value="Nav" />
                 <Setter Property="Template">
                     <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Grid x:Name="RootGrid"
-                                  Background="{TemplateBinding Background}"
-                                  CornerRadius="{TemplateBinding CornerRadius}"
-                                  Padding="{TemplateBinding Padding}">
-                                <ContentPresenter
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Content="{TemplateBinding Content}" />
+                        <ControlTemplate TargetType="RadioButton">
+                            <!-- Hover and selection use separate layers so their visual states never fight over one property. -->
+                            <Grid Height="38" Background="Transparent">
+                                <Border x:Name="Hover" CornerRadius="8" Background="{StaticResource ForgeHoverBrush}" Opacity="0" />
+                                <Border x:Name="Selected" CornerRadius="8" Background="{StaticResource ForgeAccentSoftBrush}" Opacity="0" />
+                                <Border x:Name="Marker" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left" Background="{StaticResource ForgeAccentBrush}" Opacity="0" />
+                                <ContentPresenter x:Name="Content" Margin="12,0" VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}" Content="{TemplateBinding Content}" />
                                 <VisualStateManager.VisualStateGroups>
                                     <VisualStateGroup x:Name="CommonStates">
                                         <VisualState x:Name="Normal" />
                                         <VisualState x:Name="PointerOver">
                                             <VisualState.Setters>
-                                                <Setter Target="RootGrid.Background" Value="#FFC67538" />
+                                                <Setter Target="Hover.Opacity" Value="1" />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="Pressed">
                                             <VisualState.Setters>
-                                                <Setter Target="RootGrid.Background" Value="#FFA85E2C" />
+                                                <Setter Target="Hover.Opacity" Value="0.7" />
                                             </VisualState.Setters>
                                         </VisualState>
-                                        <VisualState x:Name="Disabled">
+                                        <VisualState x:Name="Disabled" />
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="CheckStates">
+                                        <VisualState x:Name="Unchecked" />
+                                        <VisualState x:Name="Indeterminate" />
+                                        <VisualState x:Name="Checked">
                                             <VisualState.Setters>
-                                                <Setter Target="RootGrid.Opacity" Value="0.45" />
+                                                <Setter Target="Selected.Opacity" Value="1" />
+                                                <Setter Target="Content.Foreground" Value="{StaticResource ForgeAccentBrush}" />
+                                                <Setter Target="Marker.Opacity" Value="1" />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>

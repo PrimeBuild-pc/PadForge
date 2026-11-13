@@ -14,6 +14,7 @@ public partial class App : Application
     private PadEngine? _engine;
     private InputPump? _input;
     private bool _shutDown;
+    private Mutex? _singleInstance;
 
     public App()
     {
@@ -23,13 +24,22 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // Two copies would fight over the hotkey, the hooks and the virtual pad.
+        _singleInstance = new Mutex(true, @"Local\PadForge.SingleInstance", out bool first);
+        if (!first)
+        {
+            ForegroundWindow.ActivateExisting("PadForge");
+            Exit();
+            return;
+        }
+
         TimerResolution.Begin();
 
         var store = new ProfileStore(ProfileStore.DefaultDirectory);
         Profile profile = store.LoadOrCreateDefault();
-        var pad = new VigemXboxGamepad();
+        var pad = new VigemGamepad();
         _input = new InputPump();
-        _engine = new PadEngine(_input, _input, pad, profile.ToActive());
+        _engine = new PadEngine(_input, _input, pad, profile.ToActive(), _input);
         _input.HotkeyPressed += () => _engine.RequestToggle();
         _input.Start(profile.HotkeyVirtualKey);
         _engine.Start();
@@ -57,5 +67,7 @@ public partial class App : Application
         _engine?.Dispose();
         _input?.Dispose();
         TimerResolution.End();
+        _singleInstance?.ReleaseMutex();
+        _singleInstance?.Dispose();
     }
 }

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PadForge.Views.MappingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="1180" Padding="36,4,36,32" Spacing="16">
+            <Grid>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Mapping" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Click any control to remap it, then press a key, mouse button or wheel. Backspace clears, Escape cancels." Style="{StaticResource PageSubtitle}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Button Content="Reset to defaults" Command="{x:Bind ViewModel.ResetBindingsCommand}" Style="{StaticResource ForgeSecondaryButton}" />
+                    <Button Content="Save profile" Command="{x:Bind ViewModel.SaveProfileCommand}" Style="{StaticResource ForgePrimaryButton}" />
+                </StackPanel>
+            </Grid>
+
+            <Border Style="{StaticResource ForgeCard}" Padding="12">
+                <Viewbox Stretch="Uniform" StretchDirection="Both" MaxHeight="640">
+                    <Canvas x:Name="Board" Width="1000" Height="600" />
+                </Viewbox>
+            </Border>
+
+            <TextBlock Style="{StaticResource MutedBody}" Text="Boxes light up while you press their key, so you can check a layout without leaving this page. The right stick always follows the mouse; tune it on Aim &amp; sticks." />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
