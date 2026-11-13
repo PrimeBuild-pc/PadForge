@@ -16,6 +16,7 @@ public sealed class PadEngine : IDisposable
     private readonly IMouseSource _mouse;
     private readonly IKeyboardSource _keyboard;
     private readonly IVirtualGamepad _pad;
+    private readonly IInputBlocker? _blocker;
     private readonly MouseToStickConverter _rightStick = new();
     private readonly Channel<Action> _commands = Channel.CreateUnbounded<Action>(new UnboundedChannelOptions
     {
@@ -31,13 +32,21 @@ public sealed class PadEngine : IDisposable
     private bool _wasSubmitting;
     private bool _disposed;
     private long _lastTimestamp;
+    private float _calibrationRemaining = -1f;
+    private float _calibrationPeak;
 
-    public PadEngine(IMouseSource mouse, IKeyboardSource keyboard, IVirtualGamepad pad, ActiveSettings settings)
+    public PadEngine(
+        IMouseSource mouse,
+        IKeyboardSource keyboard,
+        IVirtualGamepad pad,
+        ActiveSettings settings,
+        IInputBlocker? blocker = null)
     {
         _mouse = mouse;
         _keyboard = keyboard;
         _pad = pad;
         _settings = settings;
+        _blocker = blocker;
     }
 
     public EngineSnapshot Snapshot => _snapshot;
@@ -72,13 +81,52 @@ public sealed class PadEngine : IDisposable
 
     public void RequestCenter() => Enqueue(_rightStick.Reset);
 
+    public void RequestCalibration(float seconds)
+    {
+        float duration = Math.Clamp(seconds, 0.25f, 5f);
+        Enqueue(() =>
+        {
+            _calibrationPeak = 0f;
+            _calibrationRemaining = duration;
+        });
+    }
+
+    public void RequestCancelCalibration()
+    {
+        Enqueue(() =>
+        {
+            _calibrationRemaining = -1f;
+            _calibrationPeak = 0f;
+        });
+    }
+
+    public void RequestClearCalibration()
+    {
+        Enqueue(() =>
+        {
+            if (_calibrationRemaining == 0f)
+            {
+                _calibrationRemaining = -1f;
+                _calibrationPeak = 0f;
+            }
+        });
+    }
+
     public void Apply(ActiveSettings settings, bool resetStick)
     {
         Enqueue(() =>
         {
+            // A different controller type means a different device: recreate it.
+            bool swap = _pad.IsConnected && _pad.Kind != settings.PadKind;
+            if (swap)
+                Disconnect();
+
             _settings = settings;
             if (resetStick)
                 _rightStick.Reset();
+
+            if (swap)
+                Connect();
         });
     }
 
@@ -86,6 +134,17 @@ public sealed class PadEngine : IDisposable
     {
         Drain();
         var (dx, dy) = _mouse.ConsumeDelta();
+        if (_calibrationRemaining > 0f)
+        {
+            float countsPerSecond = MathF.Sqrt((dx * dx) + (dy * dy)) / MathF.Max(deltaSeconds, 0.001f);
+            if (countsPerSecond > _calibrationPeak)
+                _calibrationPeak = countsPerSecond;
+
+            _calibrationRemaining -= deltaSeconds;
+            if (_calibrationRemaining < 0f)
+                _calibrationRemaining = 0f;
+        }
+
         ActiveSettings settings = _settings;
         ComposedInput composed = PadComposer.Compose(
             _rightStick,
@@ -117,6 +176,8 @@ public sealed class PadEngine : IDisposable
             _wasSubmitting = false;
         }
 
+        _blocker?.SetBlocking(sending && settings.HideInput, settings.Keys, settings.HotkeyVirtualKey);
+
         int busState = Volatile.Read(ref _busState);
         _snapshot = new EngineSnapshot
         {
@@ -125,7 +186,12 @@ public sealed class PadEngine : IDisposable
             BusReady = busState == 1,
             Connected = connected,
             Sending = sending,
+            PadKind = _pad.IsConnected ? _pad.Kind : settings.PadKind,
             Fault = _fault,
+            Calibrating = _calibrationRemaining > 0f,
+            CalibrationReady = _calibrationRemaining == 0f,
+            CalibrationPeak = _calibrationPeak,
+            CalibrationRemaining = MathF.Max(_calibrationRemaining, 0f),
         };
     }
 
@@ -139,6 +205,7 @@ public sealed class PadEngine : IDisposable
         if (_thread is not null && _thread.IsAlive && Thread.CurrentThread != _thread)
             _thread.Join(TimeSpan.FromSeconds(2));
 
+        _blocker?.SetBlocking(false, Array.Empty<int>(), 0);
         _pad.Dispose();
         _cancellation.Dispose();
     }
@@ -201,6 +268,7 @@ public sealed class PadEngine : IDisposable
 
         try
         {
+            _pad.Kind = _settings.PadKind;
             _pad.Connect();
             _fault = null;
         }

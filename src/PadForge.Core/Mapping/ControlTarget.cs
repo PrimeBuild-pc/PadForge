@@ -22,6 +22,7 @@ public enum ControlTarget
     LeftStickDown,
     LeftStickLeft,
     LeftStickRight,
+    LeftStickWalk,
 }
 
 public static class ControlTargetCatalog

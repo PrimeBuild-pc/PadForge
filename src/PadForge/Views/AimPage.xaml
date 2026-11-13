@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PadForge.Views.AimPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PadForge.Controls"
+    xmlns:vm="using:PadForge.ViewModels">
+    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="1120" Padding="36,4,36,32" Spacing="18">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Aim &amp; sticks" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Shape how mouse movement turns into right-stick deflection. Changes apply live." Style="{StaticResource PageSubtitle}" />
+            </StackPanel>
+
+            <!-- Presets -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Presets" Style="{StaticResource FieldLabel}" Foreground="{StaticResource ForgeMutedBrush}" Margin="0,0,6,0" />
+                <ItemsControl ItemsSource="{x:Bind Presets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StickPreset">
+                            <Button Content="{x:Bind Name}" Style="{StaticResource ChipButton}" Click="Preset_Click" Tag="{x:Bind Name}" ToolTipService.ToolTip="{x:Bind Summary}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <Grid ColumnSpacing="18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.35*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Right stick -->
+                <Border Style="{StaticResource ForgeCard}" VerticalAlignment="Top">
+                    <StackPanel Spacing="14">
+                        <Grid>
+                            <TextBlock Text="Right stick · mouse" Style="{StaticResource CardTitle}" />
+                            <TextBlock x:Name="RightReadout" Style="{StaticResource FieldValue}" Text="+0.00 +0.00" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="18" HorizontalAlignment="Center">
+                            <controls:StickView x:Name="RightGauge" />
+                            <controls:ResponseCurve x:Name="Curve" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="2">
+                            <Grid>
+                                <TextBlock Text="Sensitivity" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{x:Bind ViewModel.SensitivityText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                            </Grid>
+                            <Slider Minimum="0.2" Maximum="4" StepFrequency="0.05" Value="{x:Bind ViewModel.Sensitivity, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Sensitivity" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                            <Grid>
+                                <TextBlock Text="Vertical ratio" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{x:Bind ViewModel.VerticalScaleText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                            </Grid>
+                            <Slider Minimum="0.25" Maximum="2.5" StepFrequency="0.05" Value="{x:Bind ViewModel.VerticalScale, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Vertical sensitivity ratio" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                            <Grid>
+                                <TextBlock Text="Output curve" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{x:Bind ViewModel.CurveText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                            </Grid>
+                            <Slider Minimum="0.6" Maximum="3" StepFrequency="0.05" Value="{x:Bind ViewModel.Curve, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Response curve" />
+                        </StackPanel>
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <Grid>
+                                    <TextBlock Text="Deadzone" Style="{StaticResource FieldLabel}" />
+                                    <TextBlock Text="{x:Bind ViewModel.DeadzoneText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                                </Grid>
+                                <Slider Minimum="0" Maximum="0.3" StepFrequency="0.01" Value="{x:Bind ViewModel.Deadzone, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Deadzone" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <Grid>
+                                    <TextBlock Text="Anti-deadzone" Style="{StaticResource FieldLabel}" />
+                                    <TextBlock Text="{x:Bind ViewModel.AntiDeadzoneText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                                </Grid>
+                                <Slider Minimum="0" Maximum="0.4" StepFrequency="0.01" Value="{x:Bind ViewModel.AntiDeadzone, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Anti-deadzone" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="Anti-deadzone lifts small movements past the game's own deadzone, so slow tracking still turns the camera." Style="{StaticResource MutedBody}" />
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleSwitch Header="Invert X" IsOn="{x:Bind ViewModel.InvertX, Mode=TwoWay}" AutomationProperties.Name="Invert horizontal aim" />
+                            <ToggleSwitch Grid.Column="1" Header="Invert Y" IsOn="{x:Bind ViewModel.InvertY, Mode=TwoWay}" AutomationProperties.Name="Invert vertical aim" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="18">
+                    <!-- Calibration -->
+                    <Border Style="{StaticResource ForgeCard}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Turn-rate calibration" Style="{StaticResource CardTitle}" />
+                            <TextBlock Style="{StaticResource MutedBody}" Text="Press Calibrate, then flick the mouse at the speed that should hit full turn. PadForge sets sensitivity from your fastest movement in three seconds." />
+                            <ProgressBar Value="{x:Bind ViewModel.CalibrationProgress, Mode=OneWay}" Maximum="100" />
+                            <Button Content="{x:Bind ViewModel.CalibrateLabel, Mode=OneWay}" Command="{x:Bind ViewModel.ToggleCalibrationCommand}" Style="{StaticResource ForgePrimaryButton}" HorizontalAlignment="Left" AutomationProperties.Name="Calibrate sensitivity from a mouse flick" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Spring -->
+                    <Border Style="{StaticResource ForgeCard}">
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <TextBlock Text="Spring back to center" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.Spring, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" HorizontalAlignment="Right" AutomationProperties.Name="Spring back to center" />
+                            </Grid>
+                            <TextBlock Text="{x:Bind ViewModel.SpringHint, Mode=OneWay}" Style="{StaticResource MutedBody}" />
+                            <Grid Margin="0,6,0,0">
+                                <TextBlock Text="Return speed" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{x:Bind ViewModel.SpringRateText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                            </Grid>
+                            <Slider Minimum="4" Maximum="40" StepFrequency="1" Value="{x:Bind ViewModel.SpringRate, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.Spring, Mode=OneWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Return speed" />
+                            <Button Content="Center stick" Command="{x:Bind ViewModel.CenterStickCommand}" Style="{StaticResource ForgeSecondaryButton}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Left stick -->
+                    <Border Style="{StaticResource ForgeCard}">
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock Text="Left stick · keys" Style="{StaticResource CardTitle}" />
+                                <TextBlock x:Name="LeftReadout" Style="{StaticResource FieldValue}" Text="+0.00 +0.00" />
+                            </Grid>
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <controls:StickView x:Name="LeftGauge" Width="110" Height="110" />
+                                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                    <Grid>
+                                        <TextBlock Text="Walk speed" Style="{StaticResource FieldLabel}" />
+                                        <TextBlock Text="{x:Bind ViewModel.WalkScaleText, Mode=OneWay}" Style="{StaticResource FieldValue}" />
+                                    </Grid>
+                                    <Slider Minimum="0.1" Maximum="1" StepFrequency="0.05" Value="{x:Bind ViewModel.WalkScale, Mode=TwoWay}" Style="{StaticResource ForgeSlider}" AutomationProperties.Name="Walk speed" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource MutedBody}" VerticalAlignment="Center">
+                                            <Run Text="Hold" />
+                                            <Run Text="{x:Bind ViewModel.WalkBinding.DisplayKey, Mode=OneWay}" Foreground="{StaticResource ForgeAccentBrush}" />
+                                            <Run Text="to walk." />
+                                        </TextBlock>
+                                        <Button Grid.Column="1" Content="{x:Bind ViewModel.WalkBinding.CaptureLabel, Mode=OneWay}" Command="{x:Bind ViewModel.WalkBinding.CaptureCommand}" Style="{StaticResource ForgeSecondaryButton}" AutomationProperties.Name="Change walk key" />
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

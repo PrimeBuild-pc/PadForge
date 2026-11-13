@@ -2,64 +2,94 @@
 
 ![PadForge — keyboard and mouse, as a virtual Xbox controller](docs/banner.png)
 
-PadForge is an open-source Windows tool that turns keyboard and mouse input into a virtual Xbox 360 controller. Games that only accept a controller, or that offer aim assist to controller input, can see a real XInput device while you keep playing on a keyboard and mouse.
+[![build](https://github.com/PrimeBuild-pc/PadForge/actions/workflows/test.yml/badge.svg)](https://github.com/PrimeBuild-pc/PadForge/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/PrimeBuild-pc/PadForge?include_prereleases)](https://github.com/PrimeBuild-pc/PadForge/releases)
+[![license](https://img.shields.io/github/license/PrimeBuild-pc/PadForge)](LICENSE)
 
-The app is an unpackaged WinUI 3 program (`WindowsPackageType` is `None`). It does not inject code into games. It creates a virtual pad through the [ViGEmBus](https://github.com/nefarius/ViGEmBus) driver and feeds that pad from a background input loop.
+PadForge is a free, open-source Windows app that turns your keyboard and mouse into a virtual Xbox 360 or DualShock 4 controller. Games that only accept a pad, or that give aim assist to controller input, see a real XInput device while you keep playing on keyboard and mouse.
 
-## What it does
+It needs no account and has no paid tier. It does not inject code into games: it creates a standard virtual pad through the [ViGEmBus](https://github.com/nefarius/ViGEmBus) driver.
 
-- Creates and removes a virtual Xbox 360 controller with [Nefarius.ViGEm.Client](https://github.com/nefarius/ViGEm.NET).
-- Maps mouse movement to the right stick, with sensitivity, a response curve, a radial deadzone, and optional spring-back to center.
-- Maps keyboard and mouse buttons to the face buttons, shoulders, triggers, D-pad, Start, Back, and stick clicks. WASD drives the left stick.
-- Toggles the virtual controller with a global hotkey (F8 by default).
-- Shows a live stick and button preview. Output pauses while the PadForge window is in front, so you can tune settings without driving the pad.
-- Saves profiles as JSON under `%LocalAppData%\PadForge\profiles`.
+> **Beta.** PadForge is in beta: expect rough edges and please [report problems](https://github.com/PrimeBuild-pc/PadForge/issues).
+>
+> Use PadForge only in games that allow controller emulators. Some anti-cheat systems flag virtual controllers or input hooks.
 
-Spring-back on means the stick follows mouse speed and recenters when the mouse stops. Turn it off to hold the stick where you leave it. **Center stick** clears a held position.
+![Overview](docs/screens/overview.png)
 
-## Prerequisites
+## Features
 
-- Windows 10 version 1809 or later, or Windows 11
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) to run a build that is not self-contained for .NET
-- [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) installed and the machine rebooted if the installer asks for it
+- **Xbox 360 or DualShock 4 output**: pick the pad games see. Mapping labels, the live render and the virtual device follow your choice, and switching while connected recreates the pad. DualSense (PS5) is not available because ViGEmBus cannot emulate it.
+- **Mouse to right stick** with sensitivity, a vertical ratio, an output curve, deadzone, anti-deadzone, X/Y invert and spring-back to center (or hold mode).
+- **Presets**: Balanced, Precise, Fast flicks, Linear and Hold aim, as starting points.
+- **Turn-rate calibration**: flick the mouse for three seconds and PadForge sets sensitivity from your fastest movement.
+- **Live view**: stick gauges, a response curve with a live marker, and a controller drawing that lights up as you press.
+- **Visual mapping**: click any control on the pad and press a key, mouse button or **mouse wheel** notch.
+- **Walk key**: hold a key (Left Ctrl by default) to move the left stick at a set fraction.
+- **Hide keys and clicks from the game**: while the pad is sending, mapped keys and mouse buttons stop reaching Windows and the cursor stays still, so the game sees only the controller. Unmapped keys, Alt+Tab and the toggle key keep working.
+- **Global toggle hotkey** (F8 by default). Output pauses while PadForge itself is in front, so you can tune safely.
+- **Profiles**: create, duplicate, save under a new name and delete them. PadForge reopens the last one you used. Each is a plain JSON file under `%LocalAppData%\PadForge\profiles`.
 
-The project builds as a self-contained Windows App SDK app, so the Windows App SDK runtime is copied next to the executable. You do not need a separate Windows App Runtime install for the default build.
+| Controller | Aim & sticks |
+| --- | --- |
+| ![Controller](docs/screens/controller.png) | ![Aim and sticks](docs/screens/aim.png) |
+| **Mapping (Xbox)** | **Mapping (DualShock 4)** |
+| ![Mapping](docs/screens/mapping.png) | ![Mapping as DualShock 4](docs/screens/mapping-ds4.png) |
 
-## Build
+The controller renders were generated for PadForge with Higgsfield (Z Image) and edited to remove marks. They are not official product images.
 
-From the repository root:
+## Install
+
+1. Install [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases/latest), then restart if the installer asks.
+2. Download `PadForge-<version>-win-x64.zip` from [Releases](https://github.com/PrimeBuild-pc/PadForge/releases), extract it anywhere and run `PadForge.exe`. The build is self-contained, so you need no .NET or Windows App SDK install.
+3. Click **Connect controller** (or press F8), switch to the game, and play.
+
+Requirements: Windows 10 1809 or later, or Windows 11, x64.
+
+## How input hiding works, and its limit
+
+PadForge reads mouse motion with Raw Input and keys with `GetAsyncKeyState`. While the pad is sending and **Hide keys and clicks** is on, low-level keyboard and mouse hooks swallow mapped keys, mapped mouse buttons, mapped wheel notches and cursor movement. PadForge keeps its own state for the keys it swallows, so the pad still sees them.
+
+A release is swallowed only when its press was, so a key never sticks down in Windows when hiding switches on or off. When PadForge comes to the front, sending pauses and hiding stops.
+
+**Limit:** Windows still delivers mouse motion to programs that read it through Raw Input, so games that use Raw Input for the mouse can still see the mouse move. Hiding that needs a separate filter driver. PadForge does not install one, on purpose. Keyboard keys are hidden completely, including from Raw Input.
+
+## Build from source
+
+You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ```powershell
-dotnet build PadForge.sln -c Release
-dotnet test PadForge.sln -c Release
-```
-
-Run the app:
-
-```powershell
+dotnet test tests/PadForge.Core.Tests -c Release
+dotnet build src/PadForge/PadForge.csproj -c Release
 dotnet run --project src/PadForge/PadForge.csproj -c Release
 ```
 
-The executable is written under:
+To build the same zip as a release:
 
-```text
-src/PadForge/bin/Release/net8.0-windows10.0.19041.0/win-x64/PadForge.exe
+```powershell
+dotnet publish src/PadForge/PadForge.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -o out/PadForge
 ```
 
-## How it is split
+Pushing a tag such as `v0.2.0-beta.1` runs [`release.yml`](.github/workflows/release.yml), which tests, publishes and attaches the zip to a GitHub release. Tags with a suffix such as `-beta.1` are marked as pre-releases.
 
-- `src/PadForge.Core` maps mouse counts to a stick, composes a controller report, stores profiles, and runs the high-priority output loop. It does not reference WinUI or ViGEm, so the mapping tests run without a driver.
-- `src/PadForge` is the unpackaged WinUI 3 window, the Raw Input capture thread, and the ViGEm Xbox 360 target.
-- `tests/PadForge.Core.Tests` covers the curve, deadzone, spring, bindings, profiles, and the connect/submit loop.
+## Project layout
 
-Mouse deltas are observed with Raw Input (`RIDEV_INPUTSINK`) and keys are polled with `GetAsyncKeyState`. Neither path swallows the original input, so the game still sees the keyboard and mouse.
+- `src/PadForge.Core`: mouse-to-stick shaping, the controller report, profiles and the high-priority output loop. It has no WinUI or ViGEm reference, so its tests run anywhere.
+- `src/PadForge`: the unpackaged WinUI 3 app, the Raw Input and hook thread (`Platform/InputPump.cs`) and the ViGEm Xbox 360 target.
+- `tests/PadForge.Core.Tests`: curve, deadzone, spring, bindings, walk key, input hiding rules, profile migration and the connect/submit loop.
+- `tools/PadForge.Smoke`: end-to-end checks against real hardware paths (see below).
 
-## A PC you also use for games
+## Testing on a machine you also game on
 
-ViGEmBus is a kernel driver. After it is installed, Windows exposes a virtual gamepad on that installation, and anti-cheat running there can see it. PadForge does not install the driver.
+ViGEmBus is a kernel driver, and anti-cheat on that Windows installation can see it. Building, the live preview and the unit tests do not need it. To exercise the driver path, use a test virtual machine:
 
-Building, the live preview, and `dotnet test` do not need ViGEmBus. To connect a virtual controller without putting the driver on a machine you play on, install ViGEmBus in a Windows virtual machine and run PadForge there. Windows Sandbox is discarded when it closes, and a kernel driver usually cannot load inside it.
+```powershell
+# in the VM, after installing ViGEmBus
+PadForge.Smoke.exe driver   # creates the pad, drives it through PadEngine, reads it back with XInput
+PadForge.Smoke.exe ds4      # creates a DualShock 4 and checks that Windows enumerates it
+PadForge.Smoke.exe hooks    # checks key, wheel and cursor hiding with synthetic input only
+```
+
+ViGEmBus cannot load inside Windows Sandbox. In a Hyper-V VM, run `driver` from a signed-in desktop session: from a session without a desktop (PowerShell Direct, services), Windows stops delivering the pad's reports after the first few, even to a plain ViGEm writer.
 
 ## License
 
@@ -69,8 +99,8 @@ Copyright (c) 2026 Prime Build.
 
 ## Credits
 
-PadForge is an original implementation. These projects shaped the idea and the interface, and their code and artwork are not included:
+PadForge is an original implementation. These projects shaped the idea, and none of their code or artwork is included:
 
-- [Mouse2Joystick](https://github.com/memethyl/Mouse2Joystick) by memethyl, a reference for turning mouse movement into a virtual controller.
-- [OmniControl](https://omnicontrol.me), for the clarity of a live stick view, curves, and calibration. The PadForge layout is its own.
 - [ViGEmBus](https://github.com/nefarius/ViGEmBus) and [Nefarius.ViGEm.Client](https://github.com/nefarius/ViGEm.NET) by Nefarius, which provide the virtual Xbox 360 device.
+- [Mouse2Joystick](https://github.com/memethyl/Mouse2Joystick) by memethyl, a reference for turning mouse movement into a virtual controller.
+- [OmniControl](https://omnicontrol.me), a paid app whose clean layout (sidebar sections, live stick views, callout mapping) inspired PadForge's interface.

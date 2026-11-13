@@ -7,7 +7,7 @@ public static class KeyNames
     public static string Describe(int virtualKey)
     {
         if (virtualKey == 0)
-            return "Unbound";
+            return "Not assigned";
 
         return virtualKey switch
         {
@@ -16,6 +16,8 @@ public static class KeyNames
             VirtualKeyCodes.MouseMiddle => "Mouse middle",
             VirtualKeyCodes.MouseX1 => "Mouse back",
             VirtualKeyCodes.MouseX2 => "Mouse forward",
+            VirtualKeyCodes.WheelUp => "Wheel up",
+            VirtualKeyCodes.WheelDown => "Wheel down",
             VirtualKeyCodes.Tab => "Tab",
             VirtualKeyCodes.Enter => "Enter",
             VirtualKeyCodes.Escape => "Escape",
@@ -41,6 +43,31 @@ public static class KeyNames
             0xA3 => "Right Ctrl",
             0xA4 => "Left Alt",
             0xA5 => "Right Alt",
+            0x13 => "Pause",
+            0x2C => "Print Screen",
+            0x5B => "Left Win",
+            0x5C => "Right Win",
+            0x5D => "Menu",
+            0x6A => "Num *",
+            0x6B => "Num +",
+            0x6D => "Num -",
+            0x6E => "Num .",
+            0x6F => "Num /",
+            0x90 => "Num Lock",
+            0x91 => "Scroll Lock",
+            0xBA => ";",
+            0xBB => "=",
+            0xBC => ",",
+            0xBD => "-",
+            0xBE => ".",
+            0xBF => "/",
+            0xC0 => "`",
+            0xDB => "[",
+            0xDC => "\\",
+            0xDD => "]",
+            0xDE => "'",
+            0xE2 => "<",
+            >= 0x60 and <= 0x69 => "Num " + (virtualKey - 0x60),
             >= 0x30 and <= 0x39 => ((char)virtualKey).ToString(),
             >= 0x41 and <= 0x5A => ((char)virtualKey).ToString(),
             >= 0x70 and <= 0x87 => "F" + (virtualKey - 0x6F),

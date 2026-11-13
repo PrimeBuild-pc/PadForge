@@ -34,22 +34,84 @@ public sealed class ProfileStore
             .ToArray();
     }
 
+    /// <summary>Name of the profile that was open when the app last closed.</summary>
+    public string? LastUsed
+    {
+        get
+        {
+            try
+            {
+                return File.Exists(LastUsedPath) ? File.ReadAllText(LastUsedPath).Trim() : null;
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+        set
+        {
+            try
+            {
+                Directory.CreateDirectory(_root);
+                File.WriteAllText(LastUsedPath, SanitizeName(value));
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    private string LastUsedPath => Path.Combine(_root, ".last");
+
+    /// <summary>
+    /// Opens the last used profile, then Default, then any profile. A file that
+    /// cannot be read is skipped, so a broken profile never stops the app.
+    /// </summary>
     public Profile LoadOrCreateDefault()
     {
         Directory.CreateDirectory(_root);
-        string defaultPath = PathFor("Default");
-        if (!File.Exists(defaultPath) && List().Count == 0)
+        var candidates = new List<string>();
+        if (LastUsed is { Length: > 0 } last)
+            candidates.Add(last);
+        candidates.Add("Default");
+        candidates.AddRange(List());
+
+        foreach (string name in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var created = Profile.CreateDefault();
-            Save(created);
-            return created;
+            if (TryLoad(name, out Profile? profile))
+                return profile;
         }
 
-        if (File.Exists(defaultPath))
-            return Load("Default");
+        var created = Profile.CreateDefault();
+        if (!File.Exists(PathFor(created.Name)))
+            Save(created);
+        return created;
+    }
 
-        string? first = List().FirstOrDefault();
-        return first is null ? Profile.CreateDefault() : Load(first);
+    public bool TryLoad(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Profile? profile)
+    {
+        try
+        {
+            profile = Load(name);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or NotSupportedException)
+        {
+            profile = null;
+            return false;
+        }
+    }
+
+    public bool Exists(string name) => File.Exists(PathFor(name));
+
+    public void Delete(string name)
+    {
+        string path = PathFor(name);
+        if (File.Exists(path))
+            File.Delete(path);
     }
 
     public Profile Load(string name)
@@ -63,6 +125,7 @@ public sealed class ProfileStore
         profile.Name = SanitizeName(string.IsNullOrWhiteSpace(profile.Name) ? name : profile.Name);
         profile.RightStick ??= new StickSettings();
         profile.Bindings ??= new Dictionary<string, int>(StringComparer.Ordinal);
+        profile.Upgrade();
         return profile;
     }
 

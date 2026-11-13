@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PadForge.Core.Input;
 using PadForge.Core.Mapping;
+using PadForge.Core.Output;
 using PadForge.Core.Profiles;
 using PadForge.Core.Runtime;
 using PadForge.Platform;
@@ -12,28 +14,40 @@ namespace PadForge.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private static readonly (ControlTarget Target, string Label, string Group)[] Catalog =
+    // Name on an Xbox pad, then on a DualShock 4.
+    private static readonly (ControlTarget Target, string Xbox, string PlayStation)[] Catalog =
     [
-        (ControlTarget.LeftStickUp, "Up", "Left stick"),
-        (ControlTarget.LeftStickDown, "Down", "Left stick"),
-        (ControlTarget.LeftStickLeft, "Left", "Left stick"),
-        (ControlTarget.LeftStickRight, "Right", "Left stick"),
-        (ControlTarget.A, "A", "Face"),
-        (ControlTarget.B, "B", "Face"),
-        (ControlTarget.X, "X", "Face"),
-        (ControlTarget.Y, "Y", "Face"),
-        (ControlTarget.LeftShoulder, "LB", "Shoulders and triggers"),
-        (ControlTarget.RightShoulder, "RB", "Shoulders and triggers"),
-        (ControlTarget.LeftTrigger, "LT", "Shoulders and triggers"),
-        (ControlTarget.RightTrigger, "RT", "Shoulders and triggers"),
-        (ControlTarget.DpadUp, "Up", "D-pad"),
-        (ControlTarget.DpadDown, "Down", "D-pad"),
-        (ControlTarget.DpadLeft, "Left", "D-pad"),
-        (ControlTarget.DpadRight, "Right", "D-pad"),
-        (ControlTarget.Start, "Start", "Menu"),
-        (ControlTarget.Back, "Back", "Menu"),
-        (ControlTarget.LeftStick, "Left stick click", "Menu"),
-        (ControlTarget.RightStick, "Right stick click", "Menu"),
+        (ControlTarget.LeftStickUp, "Move forward", "Move forward"),
+        (ControlTarget.LeftStickDown, "Move back", "Move back"),
+        (ControlTarget.LeftStickLeft, "Move left", "Move left"),
+        (ControlTarget.LeftStickRight, "Move right", "Move right"),
+        (ControlTarget.LeftStickWalk, "Walk (hold)", "Walk (hold)"),
+        (ControlTarget.LeftStick, "L3 · stick click", "L3 · stick click"),
+        (ControlTarget.A, "A", "Cross ✕"),
+        (ControlTarget.B, "B", "Circle ○"),
+        (ControlTarget.X, "X", "Square □"),
+        (ControlTarget.Y, "Y", "Triangle △"),
+        (ControlTarget.LeftShoulder, "LB · left bumper", "L1"),
+        (ControlTarget.RightShoulder, "RB · right bumper", "R1"),
+        (ControlTarget.LeftTrigger, "LT · left trigger", "L2"),
+        (ControlTarget.RightTrigger, "RT · right trigger", "R2"),
+        (ControlTarget.DpadUp, "D-pad up", "D-pad up"),
+        (ControlTarget.DpadDown, "D-pad down", "D-pad down"),
+        (ControlTarget.DpadLeft, "D-pad left", "D-pad left"),
+        (ControlTarget.DpadRight, "D-pad right", "D-pad right"),
+        (ControlTarget.Start, "Start · menu", "Options"),
+        (ControlTarget.Back, "Back · view", "Share"),
+        (ControlTarget.RightStick, "R3 · stick click", "R3 · stick click"),
+    ];
+
+    /// <summary>Named starting points for the right stick. Each one is a full stick setup.</summary>
+    public static IReadOnlyList<StickPreset> Presets { get; } =
+    [
+        new("Balanced", "A safe start for most shooters.", 1.4, 0.06, 0.0, true, 26),
+        new("Precise", "Slow near center for small corrections.", 1.9, 0.04, 0.08, true, 20),
+        new("Fast flicks", "Quick turns, little curve.", 1.1, 0.05, 0.15, true, 34),
+        new("Linear", "Straight response with a lifted start.", 1.0, 0.0, 0.22, true, 26),
+        new("Hold aim", "The stick stays where the mouse leaves it.", 1.2, 0.04, 0.1, false, 26),
     ];
 
     private readonly PadEngine _engine;
@@ -48,6 +62,8 @@ public partial class MainViewModel : ObservableObject
     private long _ignoreMouseUntil;
     private string? _seenFault;
     private string? _seenHotkeyStatus;
+    private bool _calibrationArmed;
+    private bool _calibrationHandled;
 
     public MainViewModel(
         PadEngine engine,
@@ -61,12 +77,8 @@ public partial class MainViewModel : ObservableObject
         _hotkeys = hotkeys;
         _store = store;
 
-        string? previousGroup = null;
-        foreach ((ControlTarget target, string label, string group) in Catalog)
-        {
-            Bindings.Add(new BindingRow(target, label, group, group != previousGroup, BeginCapture));
-            previousGroup = group;
-        }
+        foreach ((ControlTarget target, string xbox, _) in Catalog)
+            Bindings.Add(new BindingRow(target, xbox, BeginCapture));
 
         ReloadList(profile.Name);
         ApplyProfile(profile, announce: false);
@@ -75,6 +87,8 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<BindingRow> Bindings { get; } = new();
 
     public ObservableCollection<string> Profiles { get; } = new();
+
+    public BindingRow WalkBinding => Row(ControlTarget.LeftStickWalk);
 
     public PadFrame Frame { get; private set; } = PadFrame.Neutral;
 
@@ -86,6 +100,11 @@ public partial class MainViewModel : ObservableObject
 
     public bool Sending { get; private set; }
 
+    public string Version { get; } =
+        "Version " + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
+
+    public string ProfilesFolder => ProfileStore.DefaultDirectory;
+
     public event Action? CaptureStarted;
 
     [ObservableProperty]
@@ -96,6 +115,12 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _outputHeadline = "Idle";
+
+    [ObservableProperty]
+    private string _statusTitle = "Checking for ViGEmBus";
+
+    [ObservableProperty]
+    private string _statusBody = "PadForge needs the ViGEmBus driver to create a virtual Xbox 360 controller.";
 
     [ObservableProperty]
     private string _actionLabel = "Connect";
@@ -131,6 +156,33 @@ public partial class MainViewModel : ObservableObject
     private double _springRate = 26;
 
     [ObservableProperty]
+    private double _antiDeadzone;
+
+    [ObservableProperty]
+    private bool _invertX;
+
+    [ObservableProperty]
+    private bool _invertY;
+
+    [ObservableProperty]
+    private double _verticalScale = 1;
+
+    [ObservableProperty]
+    private double _walkScale = 0.5;
+
+    [ObservableProperty]
+    private bool _hideInput = true;
+
+    [ObservableProperty]
+    private PadKind _padKind;
+
+    [ObservableProperty]
+    private string _calibrateLabel = "Calibrate";
+
+    [ObservableProperty]
+    private double _calibrationProgress;
+
+    [ObservableProperty]
     private string _hotkeyLabel = "F8";
 
     [ObservableProperty]
@@ -139,19 +191,36 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCapturing;
 
+    [ObservableProperty]
+    private bool _isDirty;
+
     public int HotkeyVirtualKey { get; private set; } = VirtualKeyCodes.F8;
 
-    public string SensitivityText => Sensitivity.ToString("0.00");
+    public string PadKindName => PadKind == PadKind.DualShock4 ? "DualShock 4" : "Xbox 360";
 
-    public string CurveText => Curve.ToString("0.00");
+    public string SensitivityText => "×" + Sensitivity.ToString("0.00");
 
-    public string DeadzoneText => Deadzone.ToString("0.00");
+    public string CurveText => Curve switch
+    {
+        < 0.95 => "Snappy " + Curve.ToString("0.00"),
+        < 1.25 => "Linear " + Curve.ToString("0.00"),
+        < 1.7 => "Steady " + Curve.ToString("0.00"),
+        _ => "Precise " + Curve.ToString("0.00"),
+    };
+
+    public string DeadzoneText => Deadzone.ToString("0%");
 
     public string SpringRateText => SpringRate.ToString("0");
 
+    public string AntiDeadzoneText => AntiDeadzone.ToString("0%");
+
+    public string VerticalScaleText => "×" + VerticalScale.ToString("0.00");
+
+    public string WalkScaleText => WalkScale.ToString("0%");
+
     public string SpringHint => Spring
-        ? "The stick follows mouse speed and returns to center."
-        : "The stick holds its position until you move it back.";
+        ? "The stick follows mouse speed and returns to center when the mouse stops."
+        : "The stick holds its position until you move it back. Center stick clears it.";
 
     public void UseForegroundPause(IntPtr windowHandle)
     {
@@ -167,12 +236,20 @@ public partial class MainViewModel : ObservableObject
         Connected = snapshot.Connected;
         Sending = snapshot.Sending;
 
-        BusHeadline = !snapshot.BusKnown ? "Checking driver" : snapshot.BusReady ? "Driver ready" : "Driver missing";
+        BusHeadline = !snapshot.BusKnown ? "Checking driver" : snapshot.BusReady ? "ViGEmBus ready" : "ViGEmBus missing";
         LinkHeadline = snapshot.Connected ? "Controller on" : "Controller off";
         OutputHeadline = !snapshot.Connected ? "Idle" : snapshot.Sending ? "Sending" : "Paused";
         ActionEnabled = snapshot.BusReady;
-        ActionLabel = snapshot.Connected ? "Disconnect" : "Connect";
+        ActionLabel = snapshot.Connected ? "Disconnect" : "Connect controller";
         ShowBusWarning = BusMissing;
+        (StatusTitle, StatusBody) = (snapshot.BusKnown, snapshot.BusReady, snapshot.Connected, snapshot.Sending) switch
+        {
+            (false, _, _, _) => ("Checking for ViGEmBus", "PadForge needs the ViGEmBus driver to create a virtual Xbox 360 controller."),
+            (true, false, _, _) => ("ViGEmBus is not installed", "Install the driver, restart if the installer asks, then reopen PadForge."),
+            (_, _, false, _) => ("Ready to connect", $"Connect, then switch to your game. {HotkeyLabel} toggles the controller from anywhere."),
+            (_, _, true, true) => ("Playing", $"Your keyboard and mouse drive the virtual pad. Press {HotkeyLabel} to stop."),
+            _ => ("Connected · paused", "Output pauses while PadForge is in front so you can tune safely. Switch to your game to play."),
+        };
 
         if (snapshot.Fault != _seenFault)
         {
@@ -189,6 +266,7 @@ public partial class MainViewModel : ObservableObject
                 StatusDetail = hotkeyStatus;
         }
 
+        TrackCalibration(snapshot);
         PollCaptureMouse();
     }
 
@@ -207,7 +285,7 @@ public partial class MainViewModel : ObservableObject
             _captureHotkey = false;
             HotkeyCaptureLabel = "Change";
             FinishCapture();
-            PushSettings(resetStick: false);
+            Changed();
             _hotkeys.SetHotkey(virtualKey);
             StatusDetail = "Toggle hotkey updated. Save the profile to keep it.";
             return true;
@@ -216,11 +294,17 @@ public partial class MainViewModel : ObservableObject
         if (_captureRow is null)
             return false;
 
+        if (virtualKey == HotkeyVirtualKey)
+        {
+            StatusDetail = KeyNames.Describe(virtualKey) + " toggles the controller. Pick another key.";
+            return true;
+        }
+
         _captureRow.SetKey(virtualKey);
         _captureRow.IsCapturing = false;
         _captureRow = null;
         FinishCapture();
-        PushSettings(resetStick: false);
+        Changed();
         StatusDetail = virtualKey == 0
             ? "Binding cleared. Save the profile to keep it."
             : "Binding updated. Save the profile to keep it.";
@@ -239,11 +323,75 @@ public partial class MainViewModel : ObservableObject
         StatusDetail = "Capture cancelled.";
     }
 
+    public BindingRow Row(ControlTarget target) => Bindings.First(row => row.Target == target);
+
+    /// <summary>Deletes the selected profile and opens another one. The caller confirms first.</summary>
+    public void DeleteSelectedProfile()
+    {
+        string? name = SelectedProfile;
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        try
+        {
+            _store.Delete(name);
+            Profile next = _store.LoadOrCreateDefault();
+            ReloadList(next.Name);
+            ApplyProfile(next, announce: false);
+            StatusDetail = "Deleted " + name + ".";
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            StatusDetail = "Could not delete that profile.";
+        }
+    }
+
     [RelayCommand]
     private void ToggleOutput() => _engine.RequestToggle();
 
     [RelayCommand]
     private void CenterStick() => _engine.RequestCenter();
+
+    [RelayCommand]
+    private void ApplyPreset(string name)
+    {
+        StickPreset? preset = Presets.FirstOrDefault(item => item.Name == name);
+        if (preset is null)
+            return;
+
+        _ready = false;
+        Curve = preset.Curve;
+        Deadzone = preset.Deadzone;
+        AntiDeadzone = preset.AntiDeadzone;
+        Spring = preset.Spring;
+        SpringRate = preset.SpringRate;
+        _ready = true;
+        Changed(resetStick: true);
+        StatusDetail = preset.Name + " applied. Sensitivity and vertical ratio are yours to tune.";
+    }
+
+    [RelayCommand]
+    private void ToggleCalibration()
+    {
+        if (_calibrationArmed)
+        {
+            _calibrationArmed = false;
+            _calibrationHandled = false;
+            CalibrateLabel = "Calibrate";
+            CalibrationProgress = 0;
+            _engine.RequestCancelCalibration();
+            StatusDetail = "Calibration cancelled.";
+            return;
+        }
+
+        _calibrationArmed = true;
+        _calibrationHandled = false;
+        CalibrateLabel = "Cancel";
+        CalibrationProgress = 0;
+        _engine.RequestCalibration(3f);
+        StatusDetail = "Flick the mouse at the speed that should reach the edge of the stick. Three seconds.";
+    }
 
     [RelayCommand]
     private void BeginHotkeyCapture()
@@ -263,9 +411,11 @@ public partial class MainViewModel : ObservableObject
         try
         {
             _store.Save(profile);
+            _store.LastUsed = profile.Name;
             ProfileName = profile.Name;
             ReloadList(profile.Name);
-            StatusDetail = "Profile saved.";
+            IsDirty = false;
+            StatusDetail = "Saved " + profile.Name + ".";
         }
         catch (Exception exception)
         {
@@ -275,73 +425,165 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void NewProfile()
+    {
+        string name = UniqueName("Profile");
+        Profile profile = Profile.CreateDefault();
+        profile.Name = name;
+        try
+        {
+            _store.Save(profile);
+            ReloadList(name);
+            ApplyProfile(profile, announce: false);
+            StatusDetail = "Created " + name + " with the default layout.";
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            StatusDetail = "Could not create a profile.";
+        }
+    }
+
+    [RelayCommand]
+    private void DuplicateProfile()
+    {
+        ProfileName = UniqueName(ProfileName + " copy");
+        SaveProfile();
+    }
+
+    [RelayCommand]
     private void ReloadProfile()
     {
         if (string.IsNullOrWhiteSpace(SelectedProfile))
             return;
 
+        if (_store.TryLoad(SelectedProfile, out Profile? profile))
+        {
+            ApplyProfile(profile, announce: false);
+            StatusDetail = "Reverted to the saved " + profile.Name + ".";
+        }
+        else
+        {
+            StatusDetail = "Could not read that profile.";
+        }
+    }
+
+    [RelayCommand]
+    private void ResetBindings()
+    {
+        Profile defaults = Profile.CreateDefault();
+        foreach (BindingRow row in Bindings)
+            row.SetKey(defaults.Binding(row.Target));
+
+        Changed();
+        StatusDetail = "Bindings reset to the default layout. Save the profile to keep them.";
+    }
+
+    [RelayCommand]
+    private void OpenProfilesFolder()
+    {
         try
         {
-            ApplyProfile(_store.Load(SelectedProfile), announce: false);
-            StatusDetail = "Profile reloaded.";
+            Directory.CreateDirectory(ProfilesFolder);
+            Process.Start(new ProcessStartInfo("explorer.exe", "\"" + ProfilesFolder + "\"") { UseShellExecute = true });
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
-            StatusDetail = "Could not read that profile.";
+            StatusDetail = "Could not open the profiles folder.";
         }
     }
 
     partial void OnSelectedProfileChanged(string? value)
     {
-        if (!_ready || string.IsNullOrWhiteSpace(value))
+        if (!_ready || string.IsNullOrWhiteSpace(value) || value == ProfileName)
             return;
 
-        try
+        if (_store.TryLoad(value, out Profile? profile))
         {
-            ApplyProfile(_store.Load(value), announce: false);
+            ApplyProfile(profile, announce: false);
             StatusDetail = "Loaded " + value + ".";
         }
-        catch (Exception exception)
+        else
         {
-            Debug.WriteLine(exception);
             StatusDetail = "Could not read that profile.";
         }
     }
 
-    partial void OnSensitivityChanged(double value)
+    partial void OnSensitivityChanged(double value) => Changed(nameof(SensitivityText));
+
+    partial void OnCurveChanged(double value) => Changed(nameof(CurveText));
+
+    partial void OnDeadzoneChanged(double value) => Changed(nameof(DeadzoneText));
+
+    partial void OnSpringChanged(bool value) => Changed(nameof(SpringHint), resetStick: true);
+
+    partial void OnSpringRateChanged(double value) => Changed(nameof(SpringRateText));
+
+    partial void OnAntiDeadzoneChanged(double value) => Changed(nameof(AntiDeadzoneText));
+
+    partial void OnInvertXChanged(bool value) => Changed(resetStick: true);
+
+    partial void OnInvertYChanged(bool value) => Changed(resetStick: true);
+
+    partial void OnVerticalScaleChanged(double value) => Changed(nameof(VerticalScaleText));
+
+    partial void OnWalkScaleChanged(double value) => Changed(nameof(WalkScaleText));
+
+    partial void OnHideInputChanged(bool value) => Changed();
+
+    partial void OnPadKindChanged(PadKind value)
     {
-        OnPropertyChanged(nameof(SensitivityText));
+        foreach ((ControlTarget target, string xbox, string playStation) in Catalog)
+            Row(target).Label = value == PadKind.DualShock4 ? playStation : xbox;
+
+        Changed(nameof(PadKindName));
         if (_ready)
-            PushSettings(resetStick: false);
+            StatusDetail = PadKindName + " selected. A connected pad is recreated as the new type.";
     }
 
-    partial void OnCurveChanged(double value)
+    private void Changed(string? textProperty = null, bool resetStick = false)
     {
-        OnPropertyChanged(nameof(CurveText));
-        if (_ready)
-            PushSettings(resetStick: false);
+        if (textProperty is not null)
+            OnPropertyChanged(textProperty);
+
+        if (!_ready)
+            return;
+
+        IsDirty = true;
+        PushSettings(resetStick);
     }
 
-    partial void OnDeadzoneChanged(double value)
+    private void TrackCalibration(EngineSnapshot snapshot)
     {
-        OnPropertyChanged(nameof(DeadzoneText));
-        if (_ready)
-            PushSettings(resetStick: false);
-    }
+        if (!_calibrationArmed)
+            return;
 
-    partial void OnSpringChanged(bool value)
-    {
-        OnPropertyChanged(nameof(SpringHint));
-        if (_ready)
-            PushSettings(resetStick: true);
-    }
+        if (snapshot.Calibrating)
+        {
+            CalibrationProgress = 100 * (1 - (snapshot.CalibrationRemaining / 3f));
+            StatusDetail = $"Flick the mouse at the speed that should reach the edge. {snapshot.CalibrationRemaining:0.0}s left.";
+            return;
+        }
 
-    partial void OnSpringRateChanged(double value)
-    {
-        OnPropertyChanged(nameof(SpringRateText));
-        if (_ready)
-            PushSettings(resetStick: false);
+        if (!snapshot.CalibrationReady || _calibrationHandled)
+            return;
+
+        _calibrationHandled = true;
+        _calibrationArmed = false;
+        CalibrateLabel = "Calibrate";
+        CalibrationProgress = 0;
+        if (FlickCalibration.TrySensitivity(snapshot.CalibrationPeak, out float sensitivity))
+        {
+            Sensitivity = sensitivity;
+            StatusDetail = $"Sensitivity set to {sensitivity:0.00} from that flick. Save the profile to keep it.";
+        }
+        else
+        {
+            StatusDetail = "No mouse movement detected. Try the calibration again.";
+        }
+
+        _engine.RequestClearCalibration();
     }
 
     private void BeginCapture(BindingRow row)
@@ -353,7 +595,7 @@ public partial class MainViewModel : ObservableObject
         row.IsCapturing = true;
         _ignoreMouseUntil = Stopwatch.GetTimestamp() + _mouseIgnoreTicks;
         RaiseCapture();
-        StatusDetail = "Press a key or mouse button. Backspace clears. Escape cancels.";
+        StatusDetail = "Press a key, mouse button or wheel. Backspace clears. Escape cancels.";
     }
 
     private void PollCaptureMouse()
@@ -368,6 +610,8 @@ public partial class MainViewModel : ObservableObject
             VirtualKeyCodes.MouseMiddle,
             VirtualKeyCodes.MouseX1,
             VirtualKeyCodes.MouseX2,
+            VirtualKeyCodes.WheelUp,
+            VirtualKeyCodes.WheelDown,
         ];
 
         foreach (int virtualKey in buttons)
@@ -389,12 +633,21 @@ public partial class MainViewModel : ObservableObject
         Sensitivity = Math.Clamp(profile.RightStick.Sensitivity, 0.2, 4);
         Curve = Math.Clamp(profile.RightStick.Curve, 0.6, 3);
         Deadzone = Math.Clamp(profile.RightStick.Deadzone, 0, 0.3);
+        AntiDeadzone = Math.Clamp(profile.RightStick.AntiDeadzone, 0, 0.4);
+        InvertX = profile.RightStick.InvertX;
+        InvertY = profile.RightStick.InvertY;
+        VerticalScale = Math.Clamp(profile.RightStick.VerticalScale, 0.25, 2.5);
         Spring = profile.RightStick.Spring;
         SpringRate = Math.Clamp(profile.RightStick.SpringRate, 4, 40);
+        WalkScale = Math.Clamp(profile.WalkScale, 0.1, 1);
+        HideInput = profile.HideInput;
+        PadKind = profile.PadKind;
         foreach (BindingRow row in Bindings)
             row.SetKey(profile.Binding(row.Target));
 
         _ready = true;
+        IsDirty = false;
+        _store.LastUsed = profile.Name;
         PushSettings(resetStick: true);
         _hotkeys.SetHotkey(HotkeyVirtualKey);
         if (announce)
@@ -407,11 +660,18 @@ public partial class MainViewModel : ObservableObject
         {
             Name = ProfileName,
             HotkeyVirtualKey = HotkeyVirtualKey,
+            WalkScale = WalkScale,
+            HideInput = HideInput,
+            PadKind = PadKind,
             RightStick = new StickSettings
             {
                 Sensitivity = Sensitivity,
                 Curve = Curve,
                 Deadzone = Deadzone,
+                AntiDeadzone = AntiDeadzone,
+                InvertX = InvertX,
+                InvertY = InvertY,
+                VerticalScale = VerticalScale,
                 Spring = Spring,
                 SpringRate = SpringRate,
             },
@@ -443,6 +703,16 @@ public partial class MainViewModel : ObservableObject
         _ready = wasReady;
     }
 
+    private string UniqueName(string stem)
+    {
+        string baseName = ProfileStore.SanitizeName(stem);
+        string name = baseName;
+        for (int i = 2; _store.Exists(name); i++)
+            name = ProfileStore.SanitizeName(baseName + " " + i);
+
+        return name;
+    }
+
     private void ClearCaptureRow()
     {
         if (_captureRow is not null)
@@ -462,3 +732,12 @@ public partial class MainViewModel : ObservableObject
         CaptureStarted?.Invoke();
     }
 }
+
+public sealed record StickPreset(
+    string Name,
+    string Summary,
+    double Curve,
+    double Deadzone,
+    double AntiDeadzone,
+    bool Spring,
+    double SpringRate);
