@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.rsuser
+TestResults/
+*.log
+.sandbox/
