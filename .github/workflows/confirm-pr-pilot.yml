@@ -1,0 +1,49 @@
+name: Confirm PR (read-only pilot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Open PR number
+        required: true
+        type: number
+      expected_head:
+        description: Full SHA of the reviewed PR head
+        required: true
+        type: string
+      expected_base:
+        description: Full SHA of the reviewed main branch
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: padforge-confirm-pr-pilot
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: >-
+      github.repository == 'PrimeBuild-pc/PadForge' && github.ref == 'refs/heads/main'
+      && github.actor_id == '162145141' && github.triggering_actor == github.repository_owner
+      && github.run_attempt == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Verify the confirmation and tested merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+          EXPECTED_BASE: ${{ inputs.expected_base }}
+        run: node .github/scripts/confirm-pr-pilot.mjs
