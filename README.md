@@ -132,3 +132,5 @@ PadForge is an original implementation. These projects shaped the idea, and none
 - [ViGEmBus](https://github.com/nefarius/ViGEmBus) and [Nefarius.ViGEm.Client](https://github.com/nefarius/ViGEm.NET) by Nefarius, which provide the virtual Xbox 360 device.
 - [Mouse2Joystick](https://github.com/memethyl/Mouse2Joystick) by memethyl, a reference for turning mouse movement into a virtual controller.
 - [OmniControl](https://omnicontrol.me), a paid app whose clean layout (sidebar sections, live stick views, callout mapping) inspired PadForge's interface.
+
+<!-- Temporary branch for the read-only GitHub Actions confirmation smoke test. -->
