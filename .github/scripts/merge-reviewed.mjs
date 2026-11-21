@@ -16,6 +16,7 @@ const input = {
   head: env.EXPECTED_HEAD,
   base: env.EXPECTED_BASE,
   workflowCommit: env.GITHUB_SHA,
+  releaseVersion: env.RELEASE_VERSION,
 };
 
 async function request(endpoint, { token = env.GH_TOKEN, method = 'GET', body } = {}) {
@@ -46,7 +47,21 @@ assert.ok(activeRules.some(rule => rule.type === 'required_status_checks'
   && rule.parameters.required_status_checks.some(check => check.context === 'build' && check.integration_id === 15368)),
 'The strict Actions build rule is required.');
 
+const run = await request(`actions/runs/${env.GITHUB_RUN_ID}`);
+const age = Date.now() - Date.parse(run.created_at);
+assert.ok(age >= 0 && age <= 30 * 60 * 1000, 'Confirmation expired. Review the PR again before starting a new run.');
+
 const verified = await verifyConfirmation(request, input);
+if (verified.release) {
+  const { version } = verified.release;
+  const project = await request(`contents/src/PadForge/PadForge.csproj?ref=${verified.merge}`);
+  assert.equal(project.encoding, 'base64', 'The version file is not available.');
+  const xml = Buffer.from(project.content, 'base64').toString('utf8');
+  const projectVersion = xml.match(/<Version>\s*([0-9]+\.[0-9]+\.[0-9]+)\s*<\/Version>/u)?.[1];
+  assert.equal(projectVersion, version.split('-')[0], 'The release version does not match the reviewed project.');
+  const tags = await request(`git/matching-refs/tags/v${version}?per_page=100`);
+  assert.ok(!tags.some(tag => tag.ref === `refs/tags/v${version}`), 'The selected release tag already exists.');
+}
 const tested = await request(`git/commits/${verified.merge}`);
 const result = await request(`pulls/${verified.number}/merge`, {
   token: env.MERGE_TOKEN,
@@ -58,6 +73,12 @@ const commit = await request(`git/commits/${result.sha}`);
 assert.deepEqual(commit.parents.map(parent => parent.sha), [verified.base, verified.head],
   'The merged commit did not have the approved parents.');
 assert.equal(commit.tree.sha, tested.tree.sha, 'The merged tree differs from the tested tree.');
+await appendFile(env.GITHUB_OUTPUT, [
+  `source=${result.sha}`,
+  `release_version=${verified.release?.version ?? ''}`,
+  `prerelease=${verified.release?.prerelease ?? false}`,
+  '',
+].join('\n'));
 await appendFile(env.GITHUB_STEP_SUMMARY, [
   '### Verified merge',
   '',
@@ -67,5 +88,6 @@ await appendFile(env.GITHUB_STEP_SUMMARY, [
   `- Approved base: ${verified.base}`,
   `- Tested merge: ${verified.merge}`,
   `- Merged commit: ${result.sha}`,
+  `- Release intent: ${verified.release?.version ?? "ordinary PR"}`,
   '',
 ].join('\n'));
