@@ -15,6 +15,10 @@ on:
         description: Full SHA of the reviewed main branch
         required: true
         type: string
+      release_version:
+        description: Leave empty for an ordinary PR. For a release, enter the version in release-intent.json.
+        required: false
+        type: string
 
 permissions:
   actions: read
@@ -34,6 +38,10 @@ jobs:
     environment: merge-automation
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      source: ${{ steps.verify.outputs.source }}
+      release_version: ${{ steps.verify.outputs.release_version }}
+      prerelease: ${{ steps.verify.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +57,7 @@ jobs:
           private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
           permission-contents: write
       - name: Recheck approval and merge
+        id: verify
         env:
           GH_TOKEN: ${{ github.token }}
           MERGE_TOKEN: ${{ steps.merge-token.outputs.token }}
@@ -56,4 +65,96 @@ jobs:
           PR_NUMBER: ${{ inputs.pull_request }}
           EXPECTED_HEAD: ${{ inputs.expected_head }}
           EXPECTED_BASE: ${{ inputs.expected_base }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
         run: node .github/scripts/merge-reviewed.mjs
+
+  build-release:
+    needs: merge
+    if: needs.merge.outputs.release_version != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.merge.outputs.release_version }}
+      source_commit: ${{ needs.merge.outputs.source }}
+
+  publish:
+    needs: [merge, build-release]
+    if: needs.merge.outputs.release_version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: PadForge-${{ needs.merge.outputs.release_version }}-win-x64
+          path: dist
+      - name: Publish the approved immutable GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.merge.outputs.release_version }}
+          COMMIT: ${{ needs.merge.outputs.source }}
+          PRERELEASE: ${{ needs.merge.outputs.prerelease }}
+        run: |
+          case "$PRERELEASE" in
+            true) kind=(--prerelease --latest=false) ;;
+            false) kind=(--latest) ;;
+            *) exit 1 ;;
+          esac
+          tag="v$VERSION"
+          archive="PadForge-$VERSION-win-x64.zip"
+          cd dist
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 2
+          test "$(tr -d '\r' < "$archive.sha256")" = "$(sha256sum "$archive")"
+          relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status)"
+          [[ "$relation" = identical || "$relation" = ahead ]]
+          remote="https://github.com/$GITHUB_REPOSITORY.git"
+          verify_tag() {
+            local refs
+            refs="$(git ls-remote "$remote" "refs/tags/$tag" "refs/tags/$tag^{}")"
+            [[ -z "$refs" || "$(tail -n1 <<< "$refs" | cut -f1)" = "$COMMIT" ]]
+            printf '%s' "$refs"
+          }
+          refs="$(verify_tag)"
+          if [[ -z "$refs" ]]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$COMMIT" --silent
+          fi
+          test -n "$(verify_tag)"
+          lookup_release() {
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+              jq -c --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] |
+                if length > 1 then error("multiple releases for the approved tag") else .[0] // empty end'
+          }
+          release="$(lookup_release)"
+          if [[ -z "$release" ]]; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft "${kind[@]}" \
+              --title "PadForge $VERSION" --generate-notes \
+              --notes "Unsigned Windows build. Verify the SHA-256 checksum before running PadForge. Source commit: $COMMIT."
+            release="$(lookup_release)"
+          fi
+          jq -e --arg title "PadForge $VERSION" --argjson prerelease "$PRERELEASE" \
+            '.name == $title and .author.login == "github-actions[bot]" and .prerelease == $prerelease' <<< "$release" >/dev/null
+          for name in "$archive" "$archive.sha256"; do
+            digest="sha256:$(sha256sum "$name" | cut -d' ' -f1)"
+            if jq -e --arg name "$name" 'any(.assets[]; .name == $name)' <<< "$release" >/dev/null; then
+              jq -e --arg name "$name" --arg digest "$digest" \
+                'any(.assets[]; .name == $name and .digest == $digest)' <<< "$release" >/dev/null
+            else
+              jq -e '.draft' <<< "$release" >/dev/null
+              gh release upload "$tag" "$name" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+          release="$(lookup_release)"
+          jq -e '.assets | length == 2' <<< "$release" >/dev/null
+          for name in "$archive" "$archive.sha256"; do
+            digest="sha256:$(sha256sum "$name" | cut -d' ' -f1)"
+            jq -e --arg name "$name" --arg digest "$digest" \
+              'any(.assets[]; .name == $name and .digest == $digest)' <<< "$release" >/dev/null
+          done
+          test -n "$(verify_tag)"
+          if jq -e '.draft' <<< "$release" >/dev/null; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false "${kind[@]}"
+          fi
+          lookup_release | jq -er 'select(.immutable and (.draft|not)) | .html_url' > "$RUNNER_TEMP/padforge-release-url"
+          test -s "$RUNNER_TEMP/padforge-release-url"
+          echo "Verified GitHub Release for $tag from $COMMIT." >> "$GITHUB_STEP_SUMMARY"

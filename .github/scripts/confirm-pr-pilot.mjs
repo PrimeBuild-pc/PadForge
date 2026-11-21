@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { verifyReleaseIntent } from './verify-release-intent.mjs';
 
 const repository = 'PrimeBuild-pc/PadForge';
 const shaPattern = /^[a-f0-9]{40}$/u;
 
-export async function verifyConfirmation(get, { number, head, base, workflowCommit }) {
+export async function verifyConfirmation(get, { number, head, base, workflowCommit, releaseVersion }) {
   assert.match(number, /^[1-9][0-9]*$/u, 'Enter a valid PR number.');
   assert.match(head, shaPattern, 'Enter the full PR head SHA.');
   assert.match(base, shaPattern, 'Enter the full main SHA.');
@@ -41,6 +42,8 @@ export async function verifyConfirmation(get, { number, head, base, workflowComm
     path => path?.toLowerCase().startsWith('.github/'),
   )), 'Changes under .github require separate review and are outside this pilot.');
 
+  const release = releaseVersion && await verifyReleaseIntent(get, merge.sha, files, releaseVersion);
+
   const { workflow_runs: [run] } = await get(
     `actions/workflows/test.yml/runs?event=pull_request&head_sha=${head}&per_page=1`,
   );
@@ -54,7 +57,7 @@ export async function verifyConfirmation(get, { number, head, base, workflowComm
 
   const latest = await readSnapshot();
   assert.equal(latest.merge_commit_sha, merge.sha, 'The test merge changed during verification.');
-  return { number, head, base, merge: merge.sha, run: run.id };
+  return { number, head, base, merge: merge.sha, run: run.id, ...(release && { release }) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
