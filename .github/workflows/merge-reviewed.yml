@@ -105,14 +105,18 @@ jobs:
           archive="PadForge-$VERSION-win-x64.zip"
           cd dist
           test "$(find . -maxdepth 1 -type f | wc -l)" -eq 2
-          test "$(tr -d '\r' < "$archive.sha256")" = "$(sha256sum "$archive")"
+          archive_hash="$(sha256sum "$archive" | cut -d' ' -f1)"
+          test "$(tr -d '\r' < "$archive.sha256")" = "$archive_hash  $archive"
           relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status)"
           [[ "$relation" = identical || "$relation" = ahead ]]
           remote="https://github.com/$GITHUB_REPOSITORY.git"
           verify_tag() {
             local refs
-            refs="$(git ls-remote "$remote" "refs/tags/$tag" "refs/tags/$tag^{}")"
-            [[ -z "$refs" || "$(tail -n1 <<< "$refs" | cut -f1)" = "$COMMIT" ]]
+            refs="$(git ls-remote "$remote" "refs/tags/$tag" "refs/tags/$tag^{}")" || return 1
+            if [[ -n "$refs" && "$(tail -n1 <<< "$refs" | cut -f1)" != "$COMMIT" ]]; then
+              echo "The approved release tag points to a different commit." >&2
+              return 1
+            fi
             printf '%s' "$refs"
           }
           refs="$(verify_tag)"
