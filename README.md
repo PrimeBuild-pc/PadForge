@@ -86,7 +86,7 @@ To build the same zip as a release:
 dotnet publish src/PadForge/PadForge.csproj -c Release -r win-x64 --self-contained -p:Platform=x64 -o out/PadForge
 ```
 
-Run [Package release candidate](.github/workflows/release.yml) on `main` with a version such as `0.2.0-beta.1` to build and verify the unsigned ZIP. The run records its source commit and provides the ZIP and its SHA-256 sidecar as Actions artifacts. GitHub Releases are managed separately.
+Run [Package release candidate](.github/workflows/release.yml) on `main` with a version such as `0.2.0-beta.1` to build and verify the unsigned ZIP. The run records its source commit and provides the ZIP and its SHA-256 sidecar as Actions artifacts. See the [release workflow guide](docs/RELEASE-WORKFLOW.md) for confirmation and release steps.
 
 ## 📁 Project layout
 
