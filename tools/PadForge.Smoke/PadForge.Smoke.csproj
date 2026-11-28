@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\PadForge.Core\PadForge.Core.csproj" />
     <Compile Include="..\..\src\PadForge\Output\VigemGamepad.cs" Link="Linked\VigemGamepad.cs" />
     <Compile Include="..\..\src\PadForge\Output\VigemBusProbe.cs" Link="Linked\VigemBusProbe.cs" />
+    <Compile Include="..\..\src\PadForge\Platform\GameInputMouse.cs" Link="Linked\GameInputMouse.cs" />
     <Compile Include="..\..\src\PadForge\Platform\InputPump.cs" Link="Linked\InputPump.cs" />
   </ItemGroup>
 </Project>

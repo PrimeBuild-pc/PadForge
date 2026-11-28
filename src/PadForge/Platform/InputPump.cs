@@ -11,11 +11,11 @@ public interface IHotkeyBinding
 }
 
 /// <summary>
-/// Reads relative mouse deltas with Raw Input and keyboard state with
+/// Reads relative mouse deltas with GameInput or Raw Input, and keyboard state with
 /// GetAsyncKeyState. While blocking is on, low-level hooks swallow mapped keys,
 /// mapped clicks and cursor movement so Windows and the game do not see them;
 /// swallowed presses are tracked here because GetAsyncKeyState no longer sees
-/// them. Raw Input still reports mouse motion, which keeps the right stick fed.
+/// them. Relative mouse readings remain available to the right stick.
 /// </summary>
 public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, IInputBlocker, IDisposable
 {
@@ -41,6 +41,7 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
     private readonly WndProc _windowProc;
     private readonly ManualResetEventSlim _ready = new(false);
     private readonly string _className = "PadForge.Input." + Environment.ProcessId;
+    private readonly bool _preferGameInput;
 
     private Thread? _thread;
     private uint _threadId;
@@ -62,8 +63,13 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
     private int _blockPass = -1;
     private volatile bool _blocking;
 
-    public InputPump()
+    public InputPump() : this(preferGameInput: true)
     {
+    }
+
+    internal InputPump(bool preferGameInput)
+    {
+        _preferGameInput = preferGameInput;
         _bufferPin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
         _bufferPointer = _bufferPin.AddrOfPinnedObject();
         _windowProc = WindowProc;
@@ -208,7 +214,9 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
             return;
         }
 
-        RegisterMouse();
+        using var gameInput = _preferGameInput ? GameInputMouse.TryStart(AddMouseDelta) : null;
+        if (gameInput is null)
+            RegisterRawMouse();
         ApplyHotkey();
         _keyboardHook = SetWindowsHookExW(WhKeyboardLl, _keyboardProc, windowClass.hInstance, 0);
         _mouseHook = SetWindowsHookExW(WhMouseLl, _mouseProc, windowClass.hInstance, 0);
@@ -235,7 +243,7 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
         _hwnd = IntPtr.Zero;
     }
 
-    private void RegisterMouse()
+    private void RegisterRawMouse()
     {
         var device = new RawInputDevice
         {
@@ -307,6 +315,11 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
 
         int x = Marshal.ReadInt32(_bufferPointer, mouse + 12);
         int y = Marshal.ReadInt32(_bufferPointer, mouse + 16);
+        AddMouseDelta(x, y);
+    }
+
+    private void AddMouseDelta(int x, int y)
+    {
         if (x == 0 && y == 0)
             return;
 
@@ -336,7 +349,7 @@ public sealed class InputPump : IMouseSource, IKeyboardSource, IHotkeyBinding, I
             int high = Marshal.ReadInt32(lParam, 8) >> 16;
             if (message == 0x0200)
             {
-                // Freeze the cursor; Raw Input still delivers the motion to the stick.
+                // Freeze the cursor while relative mouse readings feed the stick.
                 if (_blocking)
                     return (IntPtr)1;
             }
