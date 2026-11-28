@@ -176,7 +176,8 @@ void RunDualShock4()
 void RunHooks()
 {
     const int F13 = 0x7C;
-    using var pump = new InputPump();
+    // This check sends synthetic mouse events and verifies the Raw Input fallback.
+    using var pump = new InputPump(preferGameInput: false);
     pump.Start(VirtualKeyCodes.F8);
     Thread.Sleep(200);
 

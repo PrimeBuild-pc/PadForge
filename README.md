@@ -62,9 +62,11 @@ The controller renders were generated for PadForge with Higgsfield (Z Image) and
 
 Requirements: Windows 10 1809 or later, or Windows 11, x64.
 
+PadForge uses the installed [GameInput v4 runtime](https://learn.microsoft.com/en-us/gaming/gdk/docs/features/common/input/overviews/input-nuget) for mouse motion when available. This keeps mouse-to-stick input responsive when a game has focus. Raw Input remains the fallback on systems without a compatible runtime.
+
 ## 🔒 How input hiding works, and its limit
 
-PadForge reads mouse motion with Raw Input and keys with `GetAsyncKeyState`. While the pad is sending and **Hide keys and clicks** is on, low-level keyboard and mouse hooks swallow mapped keys, mapped mouse buttons, mapped wheel notches and cursor movement. PadForge keeps its own state for the keys it swallows, so the pad still sees them.
+PadForge reads keys with `GetAsyncKeyState`. While the pad is sending and **Hide keys and clicks** is on, low-level keyboard and mouse hooks swallow mapped keys, mapped mouse buttons, mapped wheel notches and cursor movement. PadForge keeps its own state for the keys it swallows, so the pad still sees them.
 
 A release is swallowed only when its press was, so a key never sticks down in Windows when hiding switches on or off. When PadForge comes to the front, sending pauses and hiding stops.
 
@@ -91,7 +93,7 @@ Run [Package release candidate](.github/workflows/release.yml) on `main` with a 
 ## 📁 Project layout
 
 - `src/PadForge.Core`: mouse-to-stick shaping, the controller report, profiles and the high-priority output loop. It has no WinUI or ViGEm reference, so its tests run anywhere.
-- `src/PadForge`: the unpackaged WinUI 3 app, the Raw Input and hook thread (`Platform/InputPump.cs`) and the ViGEm Xbox 360 target.
+- `src/PadForge`: the unpackaged WinUI 3 app, the mouse input and hook integration (`Platform/InputPump.cs`) and the ViGEm Xbox 360 target.
 - `tests/PadForge.Core.Tests`: curve, deadzone, spring, bindings, walk key, input hiding rules, profile migration and the connect/submit loop.
 - `tools/PadForge.Smoke`: end-to-end checks against real hardware paths (see below).
 
